@@ -1043,10 +1043,21 @@ function renderDetail(date) {
   const rate = names.length > 0 ? Math.round((orderedCount / names.length) * 100) : 0;
   updateStats(names.length, orderedCount, totalOrders, rate);
 
+  const allDatesForJump = Object.keys(getTestRecords()).sort().reverse();
+  const jumpOptions = allDatesForJump.map(d =>
+    `<option value="${d}" ${d === date ? 'selected' : ''}>${formatDateLabel(d)}</option>`
+  ).join('');
+
   document.getElementById('detailContent').innerHTML = `
     <div class="table-toolbar">
       <input type="text" placeholder="搜索素材名称..." value="${esc(tableFilter)}" oninput="tableFilter=this.value; renderDetail('${date}')">
-      <span style="font-size:0.78rem;color:var(--text-dim)">显示 ${filtered.length} / ${names.length}</span>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+        <label style="font-size:0.78rem;color:var(--text-dim);white-space:nowrap">跳转日期</label>
+        <select style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem;background:var(--surface)" onchange="if(this.value) selectDate(this.value)">
+          ${jumpOptions}
+        </select>
+        <span style="font-size:0.78rem;color:var(--text-dim);white-space:nowrap">显示 ${filtered.length} / ${names.length}</span>
+      </div>
     </div>
     <div style="overflow-x:auto">
       <table class="detail-table">
@@ -1074,8 +1085,24 @@ function renderEmptyDetail() {
 /* ── Summary view ── */
 let summaryFilter = '';
 let summarySort = { col: 'total', dir: 'desc' };
+let summaryDateFrom = '';
+let summaryDateTo = '';
 
 let chartRange = 7;
+
+function setSummaryDateRange() {
+  summaryDateFrom = document.getElementById('summaryDateFrom')?.value || '';
+  summaryDateTo = document.getElementById('summaryDateTo')?.value || '';
+  renderChart();
+  renderSummary();
+}
+
+function clearSummaryDateRange() {
+  summaryDateFrom = '';
+  summaryDateTo = '';
+  renderChart();
+  renderSummary();
+}
 
 function showSummary() {
   currentViewDate = null;
@@ -1094,36 +1121,50 @@ function setChartRange(days) {
 }
 
 function renderChart() {
-  document.getElementById('chartBtn7').classList.toggle('btn-primary', chartRange === 7);
-  document.getElementById('chartBtn7').style.color = chartRange === 7 ? '#fff' : '';
-  document.getElementById('chartBtn30').classList.toggle('btn-primary', chartRange === 30);
-  document.getElementById('chartBtn30').style.color = chartRange === 30 ? '#fff' : '';
-  document.getElementById('chartTitle').textContent = `出单趋势 — 近 ${chartRange} 日`;
+  const useCustomRange = !!(summaryDateFrom || summaryDateTo);
+
+  document.getElementById('chartBtn7').classList.toggle('btn-primary', !useCustomRange && chartRange === 7);
+  document.getElementById('chartBtn7').style.color = (!useCustomRange && chartRange === 7) ? '#fff' : '';
+  document.getElementById('chartBtn30').classList.toggle('btn-primary', !useCustomRange && chartRange === 30);
+  document.getElementById('chartBtn30').style.color = (!useCustomRange && chartRange === 30) ? '#fff' : '';
 
   const orderRecs = getOrderRecords();
   const testRecs = getTestRecords();
 
-  const today = new Date();
+  let dayList = [];
   const daySet = new Set();
-  const dayList = [];
-  for (let i = chartRange - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    dayList.push(ds);
-    daySet.add(ds);
-  }
 
-  const startDate = dayList[0];
-  const endDate = dayList[dayList.length - 1];
-  const allDates = new Set([...Object.keys(orderRecs), ...Object.keys(testRecs)]);
-  for (const d of allDates) {
-    if (d >= startDate && d <= endDate && !daySet.has(d)) {
+  if (useCustomRange) {
+    const allDates = [...new Set([...Object.keys(orderRecs), ...Object.keys(testRecs)])].sort();
+    for (const d of allDates) {
+      if (summaryDateFrom && d < summaryDateFrom) continue;
+      if (summaryDateTo && d > summaryDateTo) continue;
       dayList.push(d);
       daySet.add(d);
     }
+    document.getElementById('chartTitle').textContent = `出单趋势 — 自定义范围 (${dayList.length} 天)`;
+  } else {
+    const today = new Date();
+    for (let i = chartRange - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      dayList.push(ds);
+      daySet.add(ds);
+    }
+
+    const startDate = dayList[0];
+    const endDate = dayList[dayList.length - 1];
+    const allDates = new Set([...Object.keys(orderRecs), ...Object.keys(testRecs)]);
+    for (const d of allDates) {
+      if (d >= startDate && d <= endDate && !daySet.has(d)) {
+        dayList.push(d);
+        daySet.add(d);
+      }
+    }
+    dayList.sort();
+    document.getElementById('chartTitle').textContent = `出单趋势 — 近 ${chartRange} 日`;
   }
-  dayList.sort();
 
   const dayData = dayList.map(dateStr => {
     const raw = orderRecs[dateStr] || {};
@@ -1208,18 +1249,32 @@ function renderChart() {
 
 function renderSummary() {
   const orderRecs = getOrderRecords();
-  const dates = Object.keys(orderRecs).sort();
+  let dates = Object.keys(orderRecs).sort();
+
+  if (summaryDateFrom) dates = dates.filter(d => d >= summaryDateFrom);
+  if (summaryDateTo) dates = dates.filter(d => d <= summaryDateTo);
+
+  const allDates = Object.keys(orderRecs).sort();
+  const minDate = allDates.length > 0 ? allDates[0] : '';
+  const maxDate = allDates.length > 0 ? allDates[allDates.length - 1] : '';
 
   if (dates.length === 0) {
     document.getElementById('pageTitle').textContent = '出单素材汇总';
-    document.getElementById('pageSubtitle').textContent = '暂无出单数据';
+    document.getElementById('pageSubtitle').textContent = allDates.length === 0 ? '暂无出单数据' : '所选日期范围内无数据';
     document.getElementById('detailTitle').textContent = '出单素材汇总';
     document.getElementById('detailActions').innerHTML = `
       <button class="btn btn-sm" onclick="exportSummaryCSV()">导出汇总 CSV</button>`;
     document.getElementById('detailContent').innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <label style="font-size:0.8rem;color:var(--text-dim)">日期范围</label>
+        <input type="date" id="summaryDateFrom" value="${summaryDateFrom}" min="${minDate}" max="${maxDate}" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem" onchange="setSummaryDateRange()">
+        <span style="font-size:0.8rem;color:var(--text-dim)">至</span>
+        <input type="date" id="summaryDateTo" value="${summaryDateTo}" min="${minDate}" max="${maxDate}" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem" onchange="setSummaryDateRange()">
+        <button class="btn btn-sm" onclick="clearSummaryDateRange()">清除筛选</button>
+      </div>
       <div class="empty-detail">
         <span class="empty-icon">📊</span>
-        暂无出单数据，请先上传 Excel
+        ${allDates.length === 0 ? '暂无出单数据，请先上传 Excel' : '所选日期范围内无出单数据'}
       </div>`;
     updateStats(0, 0, 0, 0);
     return;
@@ -1250,7 +1305,8 @@ function renderSummary() {
 
   updateStats(totalMaterials, withOrders, grandTotal, rate);
 
-  document.getElementById('pageTitle').textContent = '出单素材汇总';
+  const dateRangeInfo = (summaryDateFrom || summaryDateTo) ? '（已筛选）' : '';
+  document.getElementById('pageTitle').textContent = '出单素材汇总' + dateRangeInfo;
   document.getElementById('pageSubtitle').textContent = `跨 ${dates.length} 天 · ${totalMaterials} 个素材 · 总出单 ${grandTotal}`;
 
   if (summaryFilter) {
@@ -1300,7 +1356,19 @@ function renderSummary() {
   document.getElementById('detailActions').innerHTML = `
     <button class="btn btn-sm" onclick="exportSummaryCSV()">导出汇总 CSV</button>`;
 
+  const rangeLabel = (summaryDateFrom || summaryDateTo)
+    ? `${summaryDateFrom ? formatDateLabel(summaryDateFrom) : '最早'} ~ ${summaryDateTo ? formatDateLabel(summaryDateTo) : '最新'}`
+    : '全部日期';
+
   document.getElementById('detailContent').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <label style="font-size:0.8rem;color:var(--text-dim)">日期范围</label>
+      <input type="date" id="summaryDateFrom" value="${summaryDateFrom}" min="${minDate}" max="${maxDate}" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem" onchange="setSummaryDateRange()">
+      <span style="font-size:0.8rem;color:var(--text-dim)">至</span>
+      <input type="date" id="summaryDateTo" value="${summaryDateTo}" min="${minDate}" max="${maxDate}" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem" onchange="setSummaryDateRange()">
+      <button class="btn btn-sm" onclick="clearSummaryDateRange()">清除筛选</button>
+      <span style="font-size:0.75rem;color:var(--text-dim)">${rangeLabel} · ${dates.length} 天</span>
+    </div>
     <div class="table-toolbar">
       <input type="text" placeholder="搜索素材名称..." value="${esc(summaryFilter)}" oninput="summaryFilter=this.value; renderSummary()">
       <span style="font-size:0.78rem;color:var(--text-dim)">显示 ${entries.length} 个出单素材，共 ${filteredTotal} 单</span>
