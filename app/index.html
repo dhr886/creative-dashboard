@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VideoMerge Pro</title>
+  <style>
+    :root {
+      --bg-primary: #0a0a0f;
+      --bg-secondary: #111118;
+      --bg-card: #17171f;
+      --bg-card-hover: #1e1e28;
+      --border: #2a2a38;
+      --border-active: #6366f1;
+      --text-primary: #eeeef2;
+      --text-secondary: #8b8ca0;
+      --text-muted: #555668;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-glow: rgba(99,102,241,0.25);
+      --success: #22c55e;
+      --success-bg: rgba(34,197,94,0.1);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245,158,11,0.1);
+      --error: #ef4444;
+      --error-bg: rgba(239,68,68,0.1);
+      --purple: #a855f7;
+      --purple-bg: rgba(168,85,247,0.1);
+      --gradient: linear-gradient(135deg, #6366f1, #a855f7);
+      --gradient-wide: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+      --r: 12px;
+      --r-sm: 8px;
+      --r-lg: 16px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.35);
+      --t: 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-app-region: drag;
+    }
+    button, input, select, .drop-zone, .file-item, .no-drag { -webkit-app-region: no-drag; }
+
+    /* ── Header ── */
+    .header {
+      position: sticky; top:0; z-index:100;
+      background: rgba(10,10,15,0.82);
+      backdrop-filter: blur(24px) saturate(1.3);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+    }
+    .header-inner {
+      max-width:1400px; margin:0 auto; height:52px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .logo { display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; padding-left:68px; }
+    .logo-icon {
+      width:30px; height:30px; background:var(--gradient); border-radius:8px;
+      display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:800; color:#fff;
+    }
+    .logo-sub { font-size:0.6rem; font-weight:600; background:var(--gradient-wide); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:0.05em; }
+    .header-right { display:flex; align-items:center; gap:16px; font-size:0.8rem; color:var(--text-secondary); }
+    .status-dot { width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; }
+    .status-dot.ok { background:var(--success); box-shadow:0 0 6px rgba(34,197,94,0.4); }
+
+    /* ── Main ── */
+    .main { max-width:1400px; margin:0 auto; padding:1.5rem 2rem 2rem; -webkit-app-region: no-drag; }
+    .hero { text-align:center; padding:1.2rem 0 1.8rem; }
+    .hero h1 { font-size:1.6rem; font-weight:700; letter-spacing:-0.03em; background:var(--gradient-wide); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .hero p { font-size:0.9rem; color:var(--text-secondary); margin-top:6px; }
+
+    /* ── Drop Zones ── */
+    .workspace { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem; }
+    .drop-zone {
+      background:var(--bg-card); border:2px dashed var(--border); border-radius:var(--r-lg);
+      padding:2.2rem 1.5rem; text-align:center; cursor:pointer; transition:all var(--t); position:relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over { border-color:var(--accent); background:var(--bg-card-hover); }
+    .drop-zone.has-files { border-style:solid; border-color:var(--border); padding:1rem; text-align:left; }
+    .drop-icon { font-size:2.2rem; margin-bottom:8px; display:block; }
+    .drop-label { font-size:1.05rem; font-weight:600; margin-bottom:4px; }
+    .drop-tag { display:inline-block; padding:1px 9px; border-radius:20px; font-size:0.7rem; font-weight:700; margin-left:5px; vertical-align:middle; }
+    .zone-a .drop-tag { background:rgba(99,102,241,0.13); color:var(--accent); }
+    .zone-b .drop-tag { background:var(--purple-bg); color:var(--purple); }
+    .drop-hint { font-size:0.8rem; color:var(--text-muted); }
+
+    /* ── File List ── */
+    .zone-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .zone-title { font-size:0.82rem; font-weight:600; display:flex; align-items:center; gap:6px; }
+    .zone-count { font-size:0.7rem; color:var(--text-muted); background:rgba(255,255,255,0.05); padding:1px 8px; border-radius:10px; }
+    .zone-btns { display:flex; gap:5px; }
+    .zone-btn {
+      padding:3px 10px; font-size:0.72rem; border:1px solid var(--border); background:transparent;
+      color:var(--text-secondary); border-radius:6px; cursor:pointer; transition:all var(--t);
+    }
+    .zone-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .zone-btn.danger:hover { border-color:var(--error); color:var(--error); }
+    .file-list { max-height:240px; overflow-y:auto; }
+    .file-list::-webkit-scrollbar { width:3px; }
+    .file-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+    .file-item { display:flex; align-items:center; gap:9px; padding:7px 10px; border-radius:var(--r-sm); transition:background var(--t); font-size:0.82rem; }
+    .file-item:hover { background:rgba(255,255,255,0.03); }
+    .file-item-icon { width:30px; height:30px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.85rem; flex-shrink:0; }
+    .zone-a .file-item-icon { background:rgba(99,102,241,0.1); }
+    .zone-b .file-item-icon { background:var(--purple-bg); }
+    .file-item-info { flex:1; min-width:0; }
+    .file-item-name { font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .file-item-meta { font-size:0.7rem; color:var(--text-muted); margin-top:1px; }
+    .file-item-rm {
+      width:26px; height:26px; border:none; background:transparent; color:var(--text-muted);
+      cursor:pointer; border-radius:6px; display:flex; align-items:center; justify-content:center;
+      transition:all var(--t); font-size:0.9rem; flex-shrink:0;
+    }
+    .file-item-rm:hover { background:var(--error-bg); color:var(--error); }
+
+    /* ── Config ── */
+    .config {
+      background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg);
+      padding:1.2rem 1.4rem; margin-bottom:1.2rem;
+    }
+    .config-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+    .config-title { font-size:0.95rem; font-weight:600; display:flex; align-items:center; gap:7px; }
+    .config-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:0.9rem; }
+    .config-item label { display:block; font-size:0.75rem; font-weight:500; color:var(--text-secondary); margin-bottom:5px; }
+    .config-sel, .config-inp {
+      width:100%; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--r-sm);
+      padding:9px 11px; color:var(--text-primary); font-size:0.85rem; outline:none; transition:border-color var(--t);
+    }
+    .config-sel:focus, .config-inp:focus { border-color:var(--accent); }
+    .config-sel {
+      cursor:pointer; -webkit-appearance:none; appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239495a5' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 10px center; padding-right:30px;
+    }
+    .match-btns { display:flex; gap:5px; }
+    .match-btn {
+      padding:5px 13px; font-size:0.78rem; font-weight:500; border:1px solid var(--border);
+      background:transparent; color:var(--text-secondary); border-radius:20px; cursor:pointer; transition:all var(--t);
+    }
+    .match-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .match-btn:hover:not(.active) { border-color:var(--accent); color:var(--accent); }
+    .mode-hint { font-size:0.72rem; color:var(--text-muted); margin-top:6px; }
+
+    /* ── Output Dir ── */
+    .output-dir {
+      display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1px solid var(--border);
+      border-radius:var(--r-lg); padding:0.8rem 1.2rem; margin-bottom:1.2rem; font-size:0.85rem;
+    }
+    .output-dir-label { font-weight:600; white-space:nowrap; }
+    .output-dir-path { flex:1; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .output-dir-btn {
+      padding:6px 14px; font-size:0.78rem; font-weight:500; border:1px solid var(--border);
+      background:transparent; color:var(--text-secondary); border-radius:6px; cursor:pointer; transition:all var(--t); white-space:nowrap;
+    }
+    .output-dir-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ── Pair Preview ── */
+    .pairs { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); margin-bottom:1.2rem; overflow:hidden; }
+    .pairs-head { display:flex; align-items:center; justify-content:space-between; padding:0.9rem 1.3rem; border-bottom:1px solid var(--border); }
+    .pairs-title { font-size:0.95rem; font-weight:600; display:flex; align-items:center; gap:7px; }
+    .pairs-badge { font-size:0.72rem; background:var(--accent); color:#fff; padding:1px 9px; border-radius:10px; font-weight:600; }
+    .pair-list { max-height:300px; overflow-y:auto; }
+    .pair-list::-webkit-scrollbar { width:3px; }
+    .pair-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+    .pair-item { display:flex; align-items:center; padding:10px 1.3rem; border-bottom:1px solid rgba(255,255,255,0.025); gap:10px; transition:background var(--t); }
+    .pair-item:last-child { border-bottom:none; }
+    .pair-item:hover { background:rgba(255,255,255,0.015); }
+    .pair-idx { width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:600; color:var(--text-muted); flex-shrink:0; }
+    .pair-vids { flex:1; display:flex; align-items:center; gap:8px; min-width:0; }
+    .pair-name { flex:1; font-size:0.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:5px 10px; border-radius:6px; min-width:0; }
+    .pair-name.a { background:rgba(99,102,241,0.07); border:1px solid rgba(99,102,241,0.13); }
+    .pair-name.b { background:rgba(168,85,247,0.07); border:1px solid rgba(168,85,247,0.13); }
+    .pair-arrow { color:var(--text-muted); font-size:0.85rem; flex-shrink:0; }
+    .pair-status { font-size:0.72rem; padding:3px 9px; border-radius:20px; font-weight:500; flex-shrink:0; min-width:54px; text-align:center; }
+    .pair-status.ready { background:rgba(255,255,255,0.04); color:var(--text-muted); }
+    .pair-status.processing { background:var(--warning-bg); color:var(--warning); }
+    .pair-status.done { background:var(--success-bg); color:var(--success); }
+    .pair-status.error { background:var(--error-bg); color:var(--error); }
+    .pair-empty { padding:2.5rem; text-align:center; color:var(--text-muted); }
+    .pair-empty-icon { font-size:1.8rem; margin-bottom:6px; display:block; }
+
+    /* ── Actions ── */
+    .actions { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.2rem; }
+    .actions-left { display:flex; gap:10px; align-items:center; }
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:7px;
+      padding:10px 22px; font-size:0.88rem; font-weight:600; border:none; border-radius:var(--r); cursor:pointer; transition:all var(--t); white-space:nowrap;
+    }
+    .btn-primary { background:var(--gradient); color:#fff; box-shadow:0 4px 14px var(--accent-glow); }
+    .btn-primary:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 6px 22px var(--accent-glow); }
+    .btn-primary:disabled { opacity:0.35; cursor:not-allowed; transform:none; }
+    .btn-secondary { background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border); }
+    .btn-secondary:hover { border-color:var(--accent); background:var(--bg-card-hover); }
+    .btn-success { background:var(--success); color:#fff; }
+    .btn-success:hover { filter:brightness(1.1); }
+
+    /* ── Progress ── */
+    .progress { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); padding:1.2rem 1.4rem; margin-bottom:1.2rem; display:none; }
+    .progress.active { display:block; }
+    .progress-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem; }
+    .progress-title { font-size:0.95rem; font-weight:600; }
+    .progress-stats { font-size:0.82rem; color:var(--text-secondary); }
+    .progress-track { width:100%; height:6px; background:var(--bg-secondary); border-radius:3px; overflow:hidden; margin-bottom:0.7rem; }
+    .progress-fill { height:100%; background:var(--gradient); border-radius:3px; transition:width 0.3s ease; width:0%; }
+    .progress-info { font-size:0.82rem; color:var(--text-secondary); display:flex; align-items:center; gap:7px; }
+    .spinner { width:13px; height:13px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Log ── */
+    .log { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; margin-bottom:1.2rem; display:none; }
+    .log.active { display:block; }
+    .log-head { display:flex; align-items:center; justify-content:space-between; padding:0.8rem 1.2rem; border-bottom:1px solid var(--border); cursor:pointer; }
+    .log-head:hover { background:rgba(255,255,255,0.015); }
+    .log-title { font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:7px; }
+    .log-body { max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
+    .log-body.open { max-height:260px; }
+    .log-content {
+      padding:0.8rem 1.2rem; font-family:"SF Mono","Fira Code",monospace; font-size:0.75rem;
+      line-height:1.55; color:var(--text-secondary); max-height:220px; overflow-y:auto;
+    }
+    .log-content::-webkit-scrollbar { width:3px; }
+    .log-content::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+    .log-entry .t { color:var(--text-muted); margin-right:6px; }
+    .log-entry.success { color:var(--success); }
+    .log-entry.error { color:var(--error); }
+
+    /* ── Results ── */
+    .results { display:none; margin-bottom:1.2rem; }
+    .results.active { display:block; }
+    .results-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem; }
+    .results-title { font-size:1.1rem; font-weight:700; display:flex; align-items:center; gap:7px; }
+    .results-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:0.9rem; }
+    .result-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; transition:all var(--t); }
+    .result-card:hover { border-color:var(--accent); transform:translateY(-2px); box-shadow:var(--shadow); }
+    .result-preview { aspect-ratio:16/9; background:var(--bg-secondary); display:flex; align-items:center; justify-content:center; font-size:2rem; }
+    .result-info { padding:10px 14px; }
+    .result-name { font-size:0.82rem; font-weight:600; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .result-meta { font-size:0.72rem; color:var(--text-muted); display:flex; align-items:center; justify-content:space-between; }
+    .result-btn { padding:3px 10px; font-size:0.72rem; font-weight:600; background:var(--gradient); color:#fff; border:none; border-radius:5px; cursor:pointer; }
+    .result-btn:hover { filter:brightness(1.15); }
+
+    /* ── Toast ── */
+    .toast-box { position:fixed; top:64px; right:20px; z-index:1000; display:flex; flex-direction:column; gap:7px; }
+    .toast { padding:10px 18px; border-radius:var(--r-sm); font-size:0.82rem; font-weight:500; display:flex; align-items:center; gap:7px; animation:slideIn 0.3s ease; box-shadow:var(--shadow); }
+    .toast.success { background:#0f2a1a; border:1px solid rgba(34,197,94,0.25); color:var(--success); }
+    .toast.error { background:#2a0f0f; border:1px solid rgba(239,68,68,0.25); color:var(--error); }
+    .toast.info { background:#0f1a2a; border:1px solid rgba(99,102,241,0.25); color:var(--accent-hover); }
+    @keyframes slideIn { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:translateX(0)} }
+
+    .footer { text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.75rem; border-top:1px solid var(--border); margin-top:1rem; }
+
+    @media(max-width:768px) {
+      .workspace { grid-template-columns:1fr; }
+      .main { padding:1rem; }
+      .actions { flex-direction:column; align-items:stretch; }
+      .pair-vids { flex-direction:column; }
+      .pair-arrow { transform:rotate(90deg); text-align:center; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">VM</div>
+      <div><div>VideoMerge Pro</div><div class="logo-sub">买量素材合并工具</div></div>
+    </div>
+    <div class="header-right">
+      <span><span class="status-dot ok"></span>FFmpeg 就绪</span>
+    </div>
+  </div>
+</header>
+
+<main class="main">
+  <section class="hero">
+    <h1>A面 + B面，一键合并</h1>
+    <p>导入 A 面和 B 面视频，自动配对批量合并，输出到本地文件夹</p>
+  </section>
+
+  <!-- Drop Zones -->
+  <section class="workspace">
+    <div class="drop-zone zone-a" id="zoneA">
+      <div id="zoneAContent">
+        <span class="drop-icon">🎬</span>
+        <div class="drop-label">A 面视频 <span class="drop-tag">片头</span></div>
+        <div class="drop-hint">拖拽文件到此处，或点击选择</div>
+        <div class="drop-hint" style="margin-top:3px;font-size:0.72rem;">支持 MP4 / MOV / WebM / AVI</div>
+      </div>
+    </div>
+    <div class="drop-zone zone-b" id="zoneB">
+      <div id="zoneBContent">
+        <span class="drop-icon">🎞️</span>
+        <div class="drop-label">B 面视频 <span class="drop-tag">片尾</span></div>
+        <div class="drop-hint">拖拽文件到此处，或点击选择</div>
+        <div class="drop-hint" style="margin-top:3px;font-size:0.72rem;">支持 MP4 / MOV / WebM / AVI</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Config -->
+  <section class="config">
+    <div class="config-head">
+      <div class="config-title">⚙️ 合并设置</div>
+      <div class="match-btns">
+        <button class="match-btn active" data-mode="order">顺序配对</button>
+        <button class="match-btn" data-mode="name">名称匹配</button>
+        <button class="match-btn" data-mode="cross">交叉组合</button>
+      </div>
+    </div>
+    <div class="mode-hint" id="modeHint">按文件名排序后，A 面和 B 面依次一一配对</div>
+    <div class="config-grid" style="margin-top:0.8rem;">
+      <div class="config-item">
+        <label>输出格式</label>
+        <select class="config-sel" id="outputFormat">
+          <option value="mp4">MP4 — 最通用</option>
+          <option value="mov">MOV — Apple 生态</option>
+        </select>
+      </div>
+      <div class="config-item">
+        <label>合并方式</label>
+        <select class="config-sel" id="mergeMode">
+          <option value="concat">首尾拼接 (A → B)</option>
+          <option value="concat-ba">首尾拼接 (B → A)</option>
+        </select>
+      </div>
+      <div class="config-item">
+        <label>输出文件名前缀</label>
+        <input type="text" class="config-inp" id="outputPrefix" value="merged_" placeholder="merged_">
+      </div>
+    </div>
+  </section>
+
+  <!-- Output Dir -->
+  <section class="output-dir">
+    <span class="output-dir-label">📁 输出目录：</span>
+    <span class="output-dir-path" id="outputDirPath">加载中...</span>
+    <button class="output-dir-btn" id="btnChangeDir">更换目录</button>
+    <button class="output-dir-btn" id="btnOpenDir">打开文件夹</button>
+  </section>
+
+  <!-- Pair Preview -->
+  <section class="pairs">
+    <div class="pairs-head">
+      <div class="pairs-title">📋 合并配对预览 <span class="pairs-badge" id="pairCount">0</span></div>
+    </div>
+    <div id="pairContainer">
+      <div class="pair-empty" id="pairEmpty">
+        <span class="pair-empty-icon">📂</span>
+        <div>请先导入 A 面和 B 面视频文件</div>
+      </div>
+      <div class="pair-list" id="pairList" style="display:none;"></div>
+    </div>
+  </section>
+
+  <!-- Actions -->
+  <section class="actions">
+    <div class="actions-left">
+      <button class="btn btn-primary" id="btnMerge" disabled>▶ 开始合并</button>
+      <button class="btn btn-secondary" id="btnReset">↺ 重置全部</button>
+    </div>
+    <div id="taskSummary" style="font-size:0.82rem;color:var(--text-secondary);"></div>
+  </section>
+
+  <!-- Progress -->
+  <section class="progress" id="progressSection">
+    <div class="progress-head">
+      <div class="progress-title" id="progressTitle">合并进度</div>
+      <div class="progress-stats" id="progressStats">0 / 0</div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressBar"></div></div>
+    <div class="progress-info" id="progressInfo"><div class="spinner"></div><span>准备中...</span></div>
+  </section>
+
+  <!-- Log -->
+  <section class="log" id="logSection">
+    <div class="log-head" id="logToggle">
+      <div class="log-title">📜 处理日志</div>
+      <span style="font-size:0.75rem;color:var(--text-muted);">▼</span>
+    </div>
+    <div class="log-body" id="logBody">
+      <div class="log-content" id="logContent"></div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section class="results" id="resultsSection">
+    <div class="results-head">
+      <div class="results-title">✅ 合并完成</div>
+      <button class="btn btn-success" id="btnOpenResults" style="padding:7px 16px;font-size:0.82rem;">📂 打开输出文件夹</button>
+    </div>
+    <div class="results-grid" id="resultsGrid"></div>
+  </section>
+</main>
+
+<div class="toast-box" id="toastBox"></div>
+
+<footer class="footer">VideoMerge Pro — 买量广告视频快速合并工具 | 本地处理，文件不上传</footer>
+
+<script>
+const state = {
+  filesA: [],
+  filesB: [],
+  pairs: [],
+  results: [],
+  matchMode: 'order',
+  isProcessing: false,
+  outputDir: '',
+};
+
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const VIDEO_EXTS = ['mp4','mov','webm','avi','mkv','flv','wmv','m4v'];
+
+/* ── Toast ── */
+function toast(msg, type='info') {
+  const icons = {success:'✓', error:'✕', info:'ℹ'};
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]}</span> ${msg}`;
+  $('#toastBox').appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transform='translateX(30px)'; el.style.transition='0.3s'; setTimeout(()=>el.remove(),300); }, 3000);
+}
+
+/* ── Log ── */
+function log(msg, type='') {
+  const t = new Date().toLocaleTimeString('zh-CN',{hour12:false});
+  const el = document.createElement('div');
+  el.className = `log-entry ${type}`;
+  el.innerHTML = `<span class="t">[${t}]</span>${msg}`;
+  $('#logContent').appendChild(el);
+  $('#logContent').scrollTop = $('#logContent').scrollHeight;
+}
+
+function fmtSize(b) {
+  if(b<1024) return b+' B';
+  if(b<1048576) return (b/1024).toFixed(1)+' KB';
+  return (b/1048576).toFixed(1)+' MB';
+}
+function stripExt(n) { return n.replace(/\.[^.]+$/,''); }
+function sanitize(n) { return n.replace(/[^a-zA-Z0-9_\-\u4e00-\u9fff]/g,'_'); }
+
+function isVideoFile(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return VIDEO_EXTS.includes(ext);
+}
+
+/* ── Init Output Dir ── */
+async function initOutputDir() {
+  state.outputDir = await window.api.getDefaultOutputDir();
+  $('#outputDirPath').textContent = state.outputDir;
+}
+
+/* ── Drop Zone ── */
+function setupZone(zoneEl, side) {
+  zoneEl.addEventListener('click', async (e) => {
+    if(e.target.closest('.file-item-rm') || e.target.closest('.zone-btn')) return;
+    const files = await window.api.selectFiles();
+    if(files.length > 0) addFiles(files, side);
+  });
+
+  zoneEl.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); zoneEl.classList.add('drag-over'); });
+  zoneEl.addEventListener('dragleave', (e) => { e.preventDefault(); zoneEl.classList.remove('drag-over'); });
+  zoneEl.addEventListener('drop', async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    zoneEl.classList.remove('drag-over');
+    const droppedFiles = [];
+    for(const f of e.dataTransfer.files) {
+      if(isVideoFile(f.name)) {
+        const info = await window.api.getFileInfo(f.path);
+        if(info) droppedFiles.push(info);
+      }
+    }
+    if(droppedFiles.length === 0) { toast('请选择视频文件','error'); return; }
+    addFiles(droppedFiles, side);
+  });
+}
+
+function addFiles(files, side) {
+  const list = side === 'A' ? state.filesA : state.filesB;
+  const existing = new Set(list.map(f=>f.path));
+  let added = 0;
+  files.forEach(f => { if(!existing.has(f.path)) { list.push(f); existing.add(f.path); added++; } });
+  list.sort((a,b) => a.name.localeCompare(b.name,'zh-CN'));
+  if(added > 0) toast(`已添加 ${added} 个 ${side} 面视频`,'success');
+  else toast('文件已存在，未添加重复项','info');
+  renderZone(side);
+  updatePairs();
+}
+
+function renderZone(side) {
+  const files = side === 'A' ? state.filesA : state.filesB;
+  const zone = side === 'A' ? $('#zoneA') : $('#zoneB');
+  const content = side === 'A' ? $('#zoneAContent') : $('#zoneBContent');
+  const icon = side === 'A' ? '🎬' : '🎞️';
+  const label = side === 'A' ? 'A 面' : 'B 面';
+  const tag = side === 'A' ? '片头' : '片尾';
+
+  if(files.length === 0) {
+    zone.classList.remove('has-files');
+    content.innerHTML = `<span class="drop-icon">${icon}</span><div class="drop-label">${label}视频 <span class="drop-tag">${tag}</span></div><div class="drop-hint">拖拽文件到此处，或点击选择</div><div class="drop-hint" style="margin-top:3px;font-size:0.72rem;">支持 MP4 / MOV / WebM / AVI</div>`;
+    return;
+  }
+  zone.classList.add('has-files');
+  content.innerHTML = `
+    <div class="zone-head">
+      <div class="zone-title">${icon} ${label} <span class="zone-count">${files.length} 个文件</span></div>
+      <div class="zone-btns">
+        <button class="zone-btn" onclick="event.stopPropagation(); addMore('${side}')">+ 添加</button>
+        <button class="zone-btn danger" onclick="event.stopPropagation(); clearSide('${side}')">清空</button>
+      </div>
+    </div>
+    <div class="file-list">${files.map((f,i)=>`
+      <div class="file-item">
+        <div class="file-item-icon">📹</div>
+        <div class="file-item-info">
+          <div class="file-item-name" title="${f.name}">${f.name}</div>
+          <div class="file-item-meta">${fmtSize(f.size)}</div>
+        </div>
+        <button class="file-item-rm" onclick="event.stopPropagation(); removeFile('${side}',${i})" title="移除">✕</button>
+      </div>`).join('')}
+    </div>`;
+}
+
+async function addMore(side) {
+  const files = await window.api.selectFiles();
+  if(files.length > 0) addFiles(files, side);
+}
+function removeFile(side, idx) {
+  (side==='A' ? state.filesA : state.filesB).splice(idx,1);
+  renderZone(side);
+  updatePairs();
+}
+function clearSide(side) {
+  if(side==='A') state.filesA=[];
+  else state.filesB=[];
+  renderZone(side);
+  updatePairs();
+  toast(`已清空 ${side} 面视频`,'info');
+}
+
+/* ── Pairs ── */
+function updatePairs() {
+  const {filesA, filesB, matchMode} = state;
+  state.pairs = [];
+  if(filesA.length && filesB.length) {
+    if(matchMode === 'order') {
+      const n = Math.min(filesA.length, filesB.length);
+      for(let i=0;i<n;i++) state.pairs.push({a:filesA[i], b:filesB[i], status:'ready'});
+    } else if(matchMode === 'name') {
+      const bMap = new Map();
+      filesB.forEach(f => bMap.set(stripExt(f.name).toLowerCase(), f));
+      filesA.forEach(fa => { const k=stripExt(fa.name).toLowerCase(); if(bMap.has(k)) state.pairs.push({a:fa, b:bMap.get(k), status:'ready'}); });
+    } else if(matchMode === 'cross') {
+      filesA.forEach(fa => filesB.forEach(fb => state.pairs.push({a:fa, b:fb, status:'ready'})));
+    }
+  }
+  renderPairs();
+}
+
+function renderPairs() {
+  const {pairs} = state;
+  $('#pairCount').textContent = pairs.length;
+  if(!pairs.length) {
+    $('#pairEmpty').style.display='';
+    $('#pairList').style.display='none';
+    $('#btnMerge').disabled=true;
+    $('#taskSummary').textContent='';
+    return;
+  }
+  $('#pairEmpty').style.display='none';
+  $('#pairList').style.display='';
+  $('#btnMerge').disabled=false;
+  const total = pairs.reduce((s,p)=>s+p.a.size+p.b.size, 0);
+  $('#taskSummary').textContent = `共 ${pairs.length} 组配对，素材总计 ${fmtSize(total)}`;
+  $('#pairList').innerHTML = pairs.map((p,i)=>`
+    <div class="pair-item" id="pair-${i}">
+      <div class="pair-idx">${i+1}</div>
+      <div class="pair-vids">
+        <div class="pair-name a" title="${p.a.name}">${p.a.name}</div>
+        <span class="pair-arrow">→</span>
+        <div class="pair-name b" title="${p.b.name}">${p.b.name}</div>
+      </div>
+      <div class="pair-status ${p.status}" id="ps-${i}">${statusText(p.status)}</div>
+    </div>`).join('');
+}
+
+function statusText(s) { return {ready:'待处理',processing:'处理中',done:'已完成',error:'失败'}[s]||s; }
+function updateStatus(i, s) {
+  state.pairs[i].status = s;
+  const el=$(`#ps-${i}`);
+  if(el) { el.className=`pair-status ${s}`; el.textContent=statusText(s); }
+}
+
+/* ── Merge ── */
+async function startMerge() {
+  if(state.isProcessing || !state.pairs.length) return;
+  state.isProcessing = true;
+  state.results = [];
+  $('#btnMerge').disabled = true;
+  $('#logSection').classList.add('active');
+  $('#logBody').classList.add('open');
+  $('#logContent').innerHTML = '';
+  $('#progressSection').classList.add('active');
+  $('#resultsSection').classList.remove('active');
+  $('#resultsGrid').innerHTML = '';
+
+  const mergeMode = $('#mergeMode').value;
+  const outputFormat = $('#outputFormat').value;
+  const prefix = $('#outputPrefix').value || 'merged_';
+  const total = state.pairs.length;
+  const t0 = Date.now();
+
+  log(`开始合并 ${total} 组视频，模式: ${mergeMode==='concat'?'A→B':'B→A'}，格式: ${outputFormat.toUpperCase()}`);
+
+  for(let i=0;i<total;i++) {
+    const pair = state.pairs[i];
+    updateStatus(i, 'processing');
+    $('#progressBar').style.width = `${(i/total)*100}%`;
+    $('#progressStats').textContent = `${i} / ${total}`;
+    $('#progressInfo').innerHTML = `<div class="spinner"></div><span>正在合并第 ${i+1} 组: ${pair.a.name} + ${pair.b.name}</span>`;
+
+    log(`[${i+1}/${total}] 合并: ${pair.a.name} + ${pair.b.name}`);
+
+    const outName = `${prefix}${sanitize(stripExt(pair.a.name))}_${sanitize(stripExt(pair.b.name))}.${outputFormat}`;
+    const outPath = state.outputDir + '/' + outName;
+
+    try {
+      const result = await window.api.mergeVideos({
+        fileA: pair.a.path,
+        fileB: pair.b.path,
+        outputPath: outPath,
+        mergeMode,
+      });
+      state.results.push({ name: outName, path: result.outputPath, size: result.size });
+      updateStatus(i, 'done');
+      log(`[${i+1}/${total}] ✓ 成功: ${outName} (${fmtSize(result.size)})`, 'success');
+    } catch(err) {
+      updateStatus(i, 'error');
+      log(`[${i+1}/${total}] ✕ 失败: ${err}`, 'error');
+      toast(`第 ${i+1} 组合并失败`, 'error');
+    }
+  }
+
+  const elapsed = ((Date.now()-t0)/1000).toFixed(1);
+  const ok = state.results.length;
+  $('#progressBar').style.width = '100%';
+  $('#progressStats').textContent = `${total} / ${total}`;
+  $('#progressInfo').innerHTML = `<span>✓ 全部完成，耗时 ${elapsed} 秒</span>`;
+  $('#progressTitle').textContent = '合并完成';
+
+  log(`任务完成: 成功 ${ok}/${total}，耗时 ${elapsed}s`, ok===total?'success':'error');
+  toast(`合并完成: ${ok}/${total} 成功，耗时 ${elapsed}s`, ok===total?'success':'info');
+
+  renderResults();
+  state.isProcessing = false;
+  $('#btnMerge').disabled = false;
+}
+
+function renderResults() {
+  if(!state.results.length) return;
+  $('#resultsSection').classList.add('active');
+  $('#resultsGrid').innerHTML = state.results.map((r,i)=>`
+    <div class="result-card">
+      <div class="result-preview">🎬</div>
+      <div class="result-info">
+        <div class="result-name" title="${r.name}">${r.name}</div>
+        <div class="result-meta">
+          <span>${fmtSize(r.size)}</span>
+          <button class="result-btn" onclick="window.api.openFile('${r.path.replace(/\\/g,'\\\\')}')">📂 定位文件</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function resetAll() {
+  if(state.isProcessing) { toast('正在处理中，请等待完成','error'); return; }
+  state.filesA=[]; state.filesB=[]; state.pairs=[]; state.results=[];
+  renderZone('A'); renderZone('B'); updatePairs();
+  $('#progressSection').classList.remove('active');
+  $('#resultsSection').classList.remove('active');
+  $('#logSection').classList.remove('active');
+  $('#progressBar').style.width='0%';
+  $('#progressTitle').textContent='合并进度';
+  toast('已重置全部','info');
+}
+
+/* ── Mode hints ── */
+const hints = {
+  order: '按文件名排序后，A 面和 B 面依次一一配对',
+  name: '自动匹配文件名相同的 A 面和 B 面（忽略扩展名）',
+  cross: '每个 A 面与所有 B 面交叉组合，适合批量混剪',
+};
+
+/* ── Event bindings ── */
+setupZone($('#zoneA'), 'A');
+setupZone($('#zoneB'), 'B');
+
+$$('.match-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.match-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.matchMode = btn.dataset.mode;
+    $('#modeHint').textContent = hints[state.matchMode];
+    updatePairs();
+  });
+});
+
+$('#btnMerge').addEventListener('click', startMerge);
+$('#btnReset').addEventListener('click', resetAll);
+$('#btnChangeDir').addEventListener('click', async () => {
+  const dir = await window.api.selectOutputDir();
+  if(dir) { state.outputDir=dir; $('#outputDirPath').textContent=dir; toast('输出目录已更换','success'); }
+});
+$('#btnOpenDir').addEventListener('click', () => window.api.openFolder(state.outputDir));
+$('#btnOpenResults').addEventListener('click', () => window.api.openFolder(state.outputDir));
+$('#logToggle').addEventListener('click', () => {
+  $('#logBody').classList.toggle('open');
+});
+
+window.api.onFfmpegLog((data) => {});
+
+// Prevent default drag behavior on document
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => e.preventDefault());
+
+initOutputDir();
+</script>
+</body>
+</html>

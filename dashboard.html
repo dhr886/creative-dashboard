@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>买量素材每日测试看板</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f6fa;
+    --surface: #ffffff;
+    --surface-hover: #f0f1f5;
+    --border: #e2e4ea;
+    --text: #1a1d2e;
+    --text-dim: #6b7085;
+    --accent: #4f6ef7;
+    --accent-hover: #3b5ce4;
+    --accent-light: rgba(79, 110, 247, 0.08);
+    --green: #10b981;
+    --green-light: rgba(16, 185, 129, 0.08);
+    --red: #ef4444;
+    --red-light: rgba(239, 68, 68, 0.08);
+    --orange: #f59e0b;
+    --orange-light: rgba(245, 158, 11, 0.08);
+    --purple: #8b5cf6;
+    --purple-light: rgba(139, 92, 246, 0.08);
+    --radius: 12px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  .app { display: flex; min-height: 100vh; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar-brand { padding: 20px; border-bottom: 1px solid var(--border); }
+  .sidebar-brand h1 { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+  .sidebar-brand p { font-size: 0.75rem; color: var(--text-dim); margin-top: 2px; }
+
+  .sidebar-section-title {
+    padding: 16px 20px 8px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+
+  .sidebar-search { padding: 0 12px 8px; }
+
+  .sidebar-search input {
+    width: 100%;
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .sidebar-search input:focus { border-color: var(--accent); }
+  .sidebar-search input::placeholder { color: var(--text-dim); }
+
+  .sidebar-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 1px;
+    border: 1px solid transparent;
+  }
+
+  .sidebar-item:hover { background: var(--surface-hover); }
+
+  .sidebar-item.active {
+    background: var(--accent-light);
+    border-color: rgba(79, 110, 247, 0.18);
+    color: var(--accent);
+  }
+
+  .sidebar-item .date-text { font-size: 0.88rem; font-weight: 500; flex: 1; }
+  .sidebar-item .date-meta { font-size: 0.72rem; color: var(--text-dim); }
+
+  .sidebar-item .delete-btn {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; opacity: 0; transition: all 0.15s;
+  }
+
+  .sidebar-item:hover .delete-btn { opacity: 1; }
+  .sidebar-item .delete-btn:hover { color: var(--red); background: var(--red-light); }
+
+  .sidebar-empty { padding: 40px 20px; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--border);
+    padding: 12px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .sidebar-footer .btn { font-size: 0.75rem; padding: 6px 10px; flex: 1; justify-content: center; }
+
+  /* ── Main ── */
+  .main { flex: 1; overflow-y: auto; padding: 28px 36px; }
+  .main-inner { max-width: 920px; }
+
+  .page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+  }
+
+  .page-header-left h2 { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.01em; }
+  .page-header-left p { font-size: 0.82rem; color: var(--text-dim); margin-top: 2px; }
+  .page-header-right { display: flex; gap: 8px; }
+
+  /* ── Stats cards ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 16px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden;
+  }
+
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .stat-card.info::before { background: var(--accent); }
+  .stat-card.success::before { background: var(--green); }
+  .stat-card.highlight::before { background: var(--orange); }
+  .stat-card.purple::before { background: var(--purple); }
+
+  .stat-card .stat-value { font-size: 1.7rem; font-weight: 700; line-height: 1.2; }
+  .stat-card .stat-label { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
+
+  .stat-card.info .stat-value { color: var(--accent); }
+  .stat-card.success .stat-value { color: var(--green); }
+  .stat-card.highlight .stat-value { color: var(--orange); }
+  .stat-card.purple .stat-value { color: var(--purple); }
+
+  /* ── Section ── */
+  .section {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px; margin-bottom: 18px; box-shadow: var(--shadow-sm);
+  }
+
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+
+  .section-title { font-size: 0.92rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .section-actions { display: flex; gap: 6px; }
+
+  /* ── Form elements ── */
+  .input-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 0.78rem; color: var(--text-dim); font-weight: 500; }
+
+  .field input[type="date"],
+  .field input[type="text"],
+  .field select {
+    padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-size: 0.85rem; outline: none; transition: border-color 0.15s;
+  }
+
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+
+  textarea.material-input {
+    width: 100%; min-height: 72px; padding: 10px 14px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.85rem;
+    resize: vertical; line-height: 1.6; font-family: inherit; outline: none; transition: border-color 0.15s;
+  }
+
+  textarea.material-input:focus { border-color: var(--accent); }
+  textarea.material-input::placeholder { color: var(--text-dim); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+    color: var(--text); font-size: 0.82rem; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap; font-family: inherit;
+  }
+
+  .btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-danger { border-color: var(--red); color: var(--red); }
+  .btn-danger:hover { background: var(--red-light); }
+  .btn-sm { padding: 5px 10px; font-size: 0.78rem; }
+
+  /* ── Tags preview ── */
+  .tags-preview { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; margin-top: 6px; }
+
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 10px;
+    border-radius: 6px; font-size: 0.78rem; background: var(--accent-light);
+    border: 1px solid rgba(79, 110, 247, 0.15); color: var(--accent); font-weight: 500;
+  }
+
+  .tag-del {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 0.65rem; padding: 1px 4px; border-radius: 3px; line-height: 1;
+    transition: all 0.15s; margin-left: 2px;
+  }
+
+  .tag-del:hover { color: var(--red); background: var(--red-light); }
+
+  .row-del-btn {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 0.72rem; padding: 3px 6px; border-radius: 4px; transition: all 0.15s;
+    opacity: 0.4;
+  }
+
+  .row-del-btn:hover { color: var(--red); background: var(--red-light); opacity: 1; }
+  tr:hover .row-del-btn { opacity: 1; }
+
+  .sidebar-item .refresh-btn {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 0.7rem; padding: 2px 5px; border-radius: 4px; opacity: 0; transition: all 0.15s;
+  }
+
+  .sidebar-item:hover .refresh-btn { opacity: 1; }
+  .sidebar-item .refresh-btn:hover { color: var(--accent); background: var(--accent-light); }
+
+  /* ── Upload area ── */
+  .upload-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+
+  .file-drop {
+    flex: 1; min-width: 200px; border: 2px dashed var(--border); border-radius: 8px;
+    padding: 18px; text-align: center; cursor: pointer; transition: all 0.2s;
+    position: relative; font-size: 0.83rem; color: var(--text-dim); background: var(--bg);
+  }
+
+  .file-drop:hover, .file-drop.dragover { border-color: var(--accent); background: var(--accent-light); }
+  .file-drop input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-result { margin-top: 10px; font-size: 0.83rem; color: var(--green); font-weight: 500; }
+
+  /* ── Detail table ── */
+  .table-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+
+  .table-toolbar input {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.82rem;
+    background: var(--bg); color: var(--text); outline: none; width: 200px; transition: border-color 0.15s;
+  }
+
+  .table-toolbar input:focus { border-color: var(--accent); }
+  .table-toolbar input::placeholder { color: var(--text-dim); }
+
+  .detail-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+
+  .detail-table th {
+    text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border);
+    color: var(--text-dim); font-weight: 600; font-size: 0.76rem; text-transform: uppercase;
+    letter-spacing: 0.04em; background: var(--bg); position: sticky; top: 0;
+  }
+
+  .detail-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .detail-table tr:last-child td { border-bottom: none; }
+  .detail-table tbody tr:hover td { background: var(--surface-hover); }
+  .detail-table .order-cell { font-weight: 600; }
+
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-dim { background: var(--surface-hover); color: var(--text-dim); }
+
+  .note-input {
+    width: 100%; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px;
+    font-size: 0.8rem; background: transparent; color: var(--text-dim); outline: none;
+    font-family: inherit; transition: all 0.15s;
+  }
+
+  .note-input:hover, .note-input:focus { border-color: var(--border); background: var(--bg); color: var(--text); }
+  .note-input::placeholder { color: var(--border); }
+
+  .empty-detail { text-align: center; padding: 48px 20px; color: var(--text-dim); font-size: 0.88rem; }
+  .empty-detail .empty-icon { font-size: 2.2rem; margin-bottom: 10px; display: block; }
+
+  /* ── Summary tab toggle ── */
+  .sidebar-nav { padding: 0 12px; margin-bottom: 4px; }
+
+  .sidebar-nav-btn {
+    width: 100%; padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--text); font-size: 0.82rem; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; text-align: left; font-family: inherit;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .sidebar-nav-btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+
+  .sidebar-nav-btn.active {
+    background: var(--green-light); border-color: rgba(16, 185, 129, 0.25);
+    color: var(--green); font-weight: 600;
+  }
+
+  /* ── Summary table ── */
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+
+  .summary-table th {
+    text-align: left; padding: 9px 10px; border-bottom: 2px solid var(--border);
+    color: var(--text-dim); font-weight: 600; font-size: 0.74rem; text-transform: uppercase;
+    letter-spacing: 0.04em; background: var(--bg); position: sticky; top: 0; white-space: nowrap;
+  }
+
+  .summary-table td {
+    padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle;
+  }
+
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table tbody tr:hover td { background: var(--surface-hover); }
+  .summary-table .order-cell { font-weight: 600; }
+  .summary-table .total-row td { font-weight: 700; background: var(--bg); border-top: 2px solid var(--border); }
+
+  .sort-btn {
+    background: none; border: none; color: var(--text-dim); cursor: pointer;
+    font-size: 0.7rem; padding: 0 2px; vertical-align: middle;
+  }
+
+  .sort-btn:hover { color: var(--accent); }
+  .sort-btn.active { color: var(--accent); font-weight: 700; }
+
+  /* ── Bar chart ── */
+  .chart-wrap { width: 100%; overflow-x: auto; }
+
+  .chart-area {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    padding: 0 4px;
+    min-width: fit-content;
+    min-height: 80px;
+    flex: 1;
+  }
+
+  .y-axis {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 6px 22px 0;
+    min-width: 32px;
+  }
+
+  .y-axis span {
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    line-height: 1;
+  }
+
+  .bar-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    min-width: 32px;
+    max-width: 48px;
+  }
+
+  .bar-value {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+    white-space: nowrap;
+  }
+
+  .bar-value.zero { color: var(--text-dim); }
+
+  .bar-fill {
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    background: var(--accent);
+    min-height: 2px;
+    transition: height 0.3s ease;
+    position: relative;
+  }
+
+  .bar-fill.has-order { background: var(--green); }
+
+  .bar-label {
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+    text-align: center;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .bar-weekday {
+    font-size: 0.58rem;
+    color: var(--text-dim);
+    opacity: 0.7;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text-dim);
+  }
+
+  .chart-legend-item { display: flex; align-items: center; gap: 5px; }
+
+  .chart-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+
+  .chart-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .chart-summary-card {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+
+  .chart-summary-card .csv { font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
+  .chart-summary-card .csl { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+  .chart-summary-card.c-green .csv { color: var(--green); }
+  .chart-summary-card.c-orange .csv { color: var(--orange); }
+  .chart-summary-card.c-purple .csv { color: var(--purple); }
+
+  /* ── Copyable name cell ── */
+  .name-cell {
+    cursor: pointer;
+    position: relative;
+    user-select: all;
+  }
+
+  .name-cell:hover { color: var(--accent); }
+
+  .name-cell .copy-tip {
+    position: absolute;
+    left: 0;
+    top: -20px;
+    font-size: 0.65rem;
+    background: #1a1d2e;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .name-cell:hover .copy-tip { opacity: 1; }
+
+  .merge-hint { font-size: 0.72rem; color: var(--text-dim); font-style: italic; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex;
+    align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px);
+  }
+
+  .modal {
+    background: var(--surface); border-radius: var(--radius); padding: 28px;
+    width: 480px; max-width: 90vw; max-height: 80vh; overflow-y: auto; box-shadow: var(--shadow-md);
+  }
+
+  .modal h3 { font-size: 1rem; font-weight: 600; margin-bottom: 16px; }
+
+  .modal textarea {
+    width: 100%; min-height: 200px; padding: 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 0.8rem; font-family: 'SF Mono', 'Cascadia Code', monospace;
+    color: var(--text); background: var(--bg); resize: vertical; outline: none;
+  }
+
+  .modal textarea:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .modal .hint { font-size: 0.78rem; color: var(--text-dim); margin-top: 8px; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    padding: 10px 24px; border-radius: 8px; font-size: 0.85rem; font-weight: 600;
+    opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: none;
+    z-index: 200; background: #1a1d2e; color: #fff; box-shadow: var(--shadow-md);
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--red); }
+
+  /* ── Responsive ── */
+  .main-inner { max-width: 100%; }
+
+  @media (max-width: 1200px) {
+    .main { padding: 24px 24px; }
+    .bar-group { min-width: 24px; }
+  }
+
+  @media (max-width: 768px) {
+    .app { flex-direction: column; }
+    .sidebar { width: 100%; min-width: auto; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+    .sidebar-list { display: flex; overflow-x: auto; gap: 4px; padding: 4px 8px; }
+    .sidebar-item { white-space: nowrap; flex-shrink: 0; }
+    .sidebar-footer { flex-direction: row; }
+    .main { padding: 14px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-card { padding: 14px 12px; }
+    .stat-card .stat-value { font-size: 1.3rem; }
+    .input-row { flex-direction: column; }
+    .upload-row { flex-direction: column; }
+    .page-header { flex-direction: column; align-items: flex-start; }
+    .section { padding: 16px; }
+    .chart-summary-cards { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .table-toolbar input { width: 100%; }
+    .detail-table th, .detail-table td,
+    .summary-table th, .summary-table td { padding: 8px 6px; font-size: 0.78rem; }
+    .bar-chart { height: 140px; }
+    .bar-group { min-width: 18px; max-width: 32px; }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .chart-summary-cards { grid-template-columns: 1fr; }
+    .sidebar-nav { padding: 8px 8px 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h1>素材测试看板</h1>
+      <p>每日素材追踪与出单分析</p>
+    </div>
+    <div class="sidebar-nav">
+      <button class="sidebar-nav-btn" id="summaryBtn" onclick="showSummary()">📊 出单素材汇总</button>
+    </div>
+    <div class="sidebar-section-title">历史记录</div>
+    <div class="sidebar-search">
+      <input type="text" id="sidebarSearch" placeholder="搜索日期..." oninput="renderSidebar()">
+    </div>
+    <div class="sidebar-list" id="sidebarList">
+      <div class="sidebar-empty">暂无记录</div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn btn-sm" onclick="exportSharedData()" title="导出共享数据，推送到 GitHub 后别人就能看到" style="background:var(--green);color:#fff">📤 更新共享数据</button>
+      <button class="btn btn-sm" onclick="exportBackup()" title="导出所有数据为 JSON 备份">导出备份</button>
+      <button class="btn btn-sm" onclick="importBackup()" title="从 JSON 文件恢复数据">导入备份</button>
+      <input type="file" id="backupFileInput" accept=".json" style="display:none">
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-inner">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h2 id="pageTitle">看板总览</h2>
+          <p id="pageSubtitle">关联出单数据 · 按日追踪 · Copy 自动归并</p>
+        </div>
+        <div class="page-header-right">
+          <button class="btn btn-sm" onclick="exportCSV()">导出 CSV</button>
+          <button class="btn btn-sm" onclick="exportAllCSV()">导出全部</button>
+        </div>
+      </div>
+
+      <!-- Stats cards -->
+      <div class="stats-grid">
+        <div class="stat-card info">
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">总测试素材</div>
+        </div>
+        <div class="stat-card success">
+          <div class="stat-value" id="statOrdered">0</div>
+          <div class="stat-label">有出单素材</div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-value" id="statOrderCount">0</div>
+          <div class="stat-label">总出单数</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-value" id="statRate">0%</div>
+          <div class="stat-label">出单率</div>
+        </div>
+      </div>
+
+      <!-- Input section -->
+      <div class="section" id="inputSection">
+        <div class="section-header">
+          <div class="section-title">录入当日测试素材</div>
+        </div>
+        <div class="input-row">
+          <div class="field">
+            <label>选择日期</label>
+            <input type="date" id="inputDate">
+          </div>
+          <button class="btn" onclick="document.getElementById('extractFileInput').click()">从文件提取名称</button>
+          <input type="file" id="extractFileInput" multiple accept="video/*,image/*" style="display:none">
+          <button class="btn btn-primary" onclick="saveTestRecord()">保存测试名单</button>
+          <button class="btn" onclick="loadExistingRecord()">加载已有记录</button>
+          <button class="btn btn-danger" onclick="clearInput()">清空</button>
+        </div>
+        <textarea class="material-input" id="materialInput" placeholder="请输入素材名称，支持逗号或换行分隔&#10;例如：素材A, 素材B, 素材C" oninput="onInputChange()"></textarea>
+        <div class="tags-preview" id="tagsPreview"></div>
+      </div>
+
+      <!-- Upload section -->
+      <div class="section" id="uploadSection">
+        <div class="section-header">
+          <div class="section-title">上传出单数据</div>
+        </div>
+        <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px">自动匹配 Results 列；带 "- Copy" 后缀的素材数据会自动归并到原素材</p>
+        <div class="upload-row">
+          <div class="field">
+            <label>出单对应测试日期</label>
+            <input type="date" id="uploadDate">
+          </div>
+          <div class="file-drop" id="fileDrop">
+            拖入或点击选择 Excel / CSV 文件
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+          </div>
+        </div>
+        <div class="upload-result" id="uploadResult"></div>
+      </div>
+
+      <!-- Chart section (summary only) -->
+      <div class="section" id="chartSection" style="display:none">
+        <div class="section-header">
+          <div class="section-title" id="chartTitle">出单趋势</div>
+          <div class="section-actions">
+            <button class="btn btn-sm" id="chartBtn7" onclick="setChartRange(7)">近 7 日</button>
+            <button class="btn btn-sm" id="chartBtn30" onclick="setChartRange(30)">近 30 日</button>
+          </div>
+        </div>
+        <div id="chartContainer"></div>
+      </div>
+
+      <!-- Detail section -->
+      <div class="section" id="detailSection">
+        <div class="section-header">
+          <div class="section-title" id="detailTitle">每日出单详情</div>
+          <div class="section-actions" id="detailActions"></div>
+        </div>
+        <div id="detailContent">
+          <div class="empty-detail">
+            <span class="empty-icon">📋</span>
+            选择左侧日期或录入素材后查看详情
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="modalContainer"></div>
+
+<script>
+const STORAGE_KEY_TEST = 'testRecords';
+const STORAGE_KEY_ORDER = 'orderRecords';
+const STORAGE_KEY_NOTES = 'noteRecords';
+
+const inputDateEl = document.getElementById('inputDate');
+const uploadDateEl = document.getElementById('uploadDate');
+const materialInputEl = document.getElementById('materialInput');
+const tagsPreviewEl = document.getElementById('tagsPreview');
+const sidebarListEl = document.getElementById('sidebarList');
+const fileInputEl = document.getElementById('fileInput');
+const fileDropEl = document.getElementById('fileDrop');
+const uploadResultEl = document.getElementById('uploadResult');
+const backupFileInputEl = document.getElementById('backupFileInput');
+
+let currentViewDate = null;
+let tableFilter = '';
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+function getWeekday(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return WEEKDAYS[new Date(y, m - 1, d).getDay()];
+}
+
+function formatDateLabel(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  return `${parseInt(m)}月${parseInt(d)}日 周${getWeekday(dateStr)}`;
+}
+
+function formatDateFull(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  return `${y}年${parseInt(m)}月${parseInt(d)}日 周${getWeekday(dateStr)}`;
+}
+
+/* ── Storage (localStorage + shared-data.json for GitHub Pages) ── */
+let _cache = { testRecords: {}, orderRecords: {}, noteRecords: {} };
+
+function getTestRecords() { return JSON.parse(JSON.stringify(_cache.testRecords || {})); }
+function getOrderRecords() { return JSON.parse(JSON.stringify(_cache.orderRecords || {})); }
+function getNoteRecords() { return JSON.parse(JSON.stringify(_cache.noteRecords || {})); }
+
+function setTestRecords(data) {
+  _cache.testRecords = data;
+  localStorage.setItem(STORAGE_KEY_TEST, JSON.stringify(data));
+}
+function setOrderRecords(data) {
+  _cache.orderRecords = data;
+  localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(data));
+}
+function setNoteRecords(data) {
+  _cache.noteRecords = data;
+  localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(data));
+}
+
+async function loadSharedData() {
+  let localTest = {}, localOrder = {}, localNote = {};
+  try { localTest = JSON.parse(localStorage.getItem(STORAGE_KEY_TEST)) || {}; } catch {}
+  try { localOrder = JSON.parse(localStorage.getItem(STORAGE_KEY_ORDER)) || {}; } catch {}
+  try { localNote = JSON.parse(localStorage.getItem(STORAGE_KEY_NOTES)) || {}; } catch {}
+
+  const hasLocal = Object.keys(localTest).length > 0;
+
+  try {
+    const res = await fetch('shared-data.json?t=' + Date.now());
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (data.testRecords && Object.keys(data.testRecords).length > 0) {
+      if (hasLocal) {
+        _cache.testRecords = localTest;
+        _cache.orderRecords = localOrder;
+        _cache.noteRecords = localNote;
+      } else {
+        _cache.testRecords = data.testRecords || {};
+        _cache.orderRecords = data.orderRecords || {};
+        _cache.noteRecords = data.noteRecords || {};
+        localStorage.setItem(STORAGE_KEY_TEST, JSON.stringify(_cache.testRecords));
+        localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(_cache.orderRecords));
+        localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(_cache.noteRecords));
+      }
+      return;
+    }
+  } catch {}
+
+  _cache.testRecords = localTest;
+  _cache.orderRecords = localOrder;
+  _cache.noteRecords = localNote;
+}
+
+function exportSharedData() {
+  const data = {
+    testRecords: _cache.testRecords,
+    orderRecords: _cache.orderRecords,
+    noteRecords: _cache.noteRecords,
+    updatedAt: new Date().toISOString()
+  };
+  downloadFile(JSON.stringify(data, null, 2), 'shared-data.json', 'application/json');
+  showToast('已导出 shared-data.json，请放到项目目录并推送到 GitHub');
+}
+
+/* ── Strip "- Copy" suffix to get base name ── */
+function getBaseName(name) {
+  return name.replace(/[\s_]*-?\s*copy(\s*\d+)?$/i, '').trim();
+}
+
+/* ── Merge order data: aggregate Copy variants into base name ── */
+function mergeOrders(rawOrders) {
+  const merged = {};
+  for (const [name, count] of Object.entries(rawOrders)) {
+    const base = getBaseName(name);
+    merged[base] = (merged[base] || 0) + (count || 0);
+  }
+  return merged;
+}
+
+/* ── Parse names ── */
+function parseNames(text) {
+  return text.split(/[,，\n]+/).map(s => s.trim()).filter(Boolean);
+}
+
+/* ── Input change handler ── */
+function onInputChange() {
+  const names = parseNames(materialInputEl.value);
+  if (names.length === 0) { tagsPreviewEl.innerHTML = ''; return; }
+  tagsPreviewEl.innerHTML = names.map((name, i) =>
+    `<span class="tag">${esc(name)}<button class="tag-del" onclick="removeFromInput(${i})" title="删除">✕</button></span>`
+  ).join('');
+}
+
+function removeFromInput(index) {
+  const names = parseNames(materialInputEl.value);
+  names.splice(index, 1);
+  materialInputEl.value = names.join('\n');
+  onInputChange();
+}
+
+/* ── Load existing record into textarea ── */
+function loadExistingRecord() {
+  const date = inputDateEl.value;
+  if (!date) { showToast('请先选择日期', true); return; }
+
+  const records = getTestRecords();
+  if (records[date] && records[date].length > 0) {
+    materialInputEl.value = records[date].join('\n');
+    onInputChange();
+    showToast(`已加载 ${formatDateLabel(date)} 的 ${records[date].length} 条记录`);
+  } else {
+    showToast(`${formatDateLabel(date)} 没有已有记录`, true);
+  }
+}
+
+/* ── Clear input ── */
+function clearInput() {
+  materialInputEl.value = '';
+  tagsPreviewEl.innerHTML = '';
+}
+
+/* ── Extract filenames from selected files ── */
+document.getElementById('extractFileInput').addEventListener('change', function() {
+  const files = Array.from(this.files);
+  if (files.length === 0) return;
+
+  const names = files.map(f => {
+    const dotIdx = f.name.lastIndexOf('.');
+    return dotIdx > 0 ? f.name.substring(0, dotIdx) : f.name;
+  });
+
+  const existing = materialInputEl.value.trim();
+  if (existing) {
+    materialInputEl.value = existing + '\n' + names.join('\n');
+  } else {
+    materialInputEl.value = names.join('\n');
+  }
+
+  onInputChange();
+  this.value = '';
+  showToast(`已提取 ${names.length} 个文件名`);
+});
+
+/* ── Save test record ── */
+function saveTestRecord() {
+  const date = inputDateEl.value;
+  if (!date) { showToast('请先选择日期', true); return; }
+
+  const names = parseNames(materialInputEl.value);
+  if (names.length === 0) { showToast('请输入至少一个素材名称', true); return; }
+
+  const records = getTestRecords();
+  if (records[date] && records[date].length > 0) {
+    if (!confirm(`${formatDateLabel(date)} 已有 ${records[date].length} 条记录，是否覆盖？`)) return;
+  }
+
+  records[date] = names;
+  setTestRecords(records);
+  materialInputEl.value = '';
+  tagsPreviewEl.innerHTML = '';
+
+  currentViewDate = date;
+  renderSidebar();
+  renderDetail(date);
+  showToast(`已保存 ${formatDateLabel(date)} 的 ${names.length} 条测试素材`);
+}
+
+/* ── Sidebar ── */
+function renderSidebar() {
+  const records = getTestRecords();
+  const orderRecs = getOrderRecords();
+  const searchVal = document.getElementById('sidebarSearch').value.toLowerCase();
+  let dates = Object.keys(records).sort().reverse();
+
+  if (searchVal) {
+    dates = dates.filter(d => d.includes(searchVal) || formatDateLabel(d).includes(searchVal));
+  }
+
+  if (dates.length === 0) {
+    sidebarListEl.innerHTML = '<div class="sidebar-empty">暂无记录</div>';
+    return;
+  }
+
+  sidebarListEl.innerHTML = dates.map(d => {
+    const count = records[d].length;
+    const rawOrders = orderRecs[d] || {};
+    const merged = mergeOrders(rawOrders);
+    const orderedCount = Object.values(merged).filter(v => v > 0).length;
+    const isActive = d === currentViewDate;
+    const orderInfo = orderedCount > 0 ? ` · ${orderedCount}出单` : '';
+    return `
+      <div class="sidebar-item ${isActive ? 'active' : ''}" onclick="selectDate('${d}')">
+        <span class="date-text">${formatDateLabel(d)}</span>
+        <span class="date-meta">${count}素材${orderInfo}</span>
+        <button class="refresh-btn" onclick="event.stopPropagation(); syncDateData('${d}')" title="同步出单数据">↻</button>
+        <button class="delete-btn" onclick="event.stopPropagation(); deleteDate('${d}')" title="删除">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function selectDate(date) {
+  currentViewDate = date;
+  document.getElementById('summaryBtn').classList.remove('active');
+  document.getElementById('inputSection').style.display = '';
+  document.getElementById('uploadSection').style.display = '';
+  document.getElementById('chartSection').style.display = 'none';
+  renderSidebar();
+  renderDetail(date);
+}
+
+function deleteDate(date) {
+  if (!confirm(`确定删除 ${formatDateLabel(date)} 的所有数据？此操作不可撤销。`)) return;
+
+  const testRecs = getTestRecords();
+  const orderRecs = getOrderRecords();
+  const noteRecs = getNoteRecords();
+  delete testRecs[date];
+  delete orderRecs[date];
+  delete noteRecs[date];
+  setTestRecords(testRecs);
+  setOrderRecords(orderRecs);
+  setNoteRecords(noteRecs);
+
+  if (currentViewDate === date) {
+    const remaining = Object.keys(testRecs).sort().reverse();
+    currentViewDate = remaining[0] || null;
+  }
+
+  renderSidebar();
+  if (currentViewDate) renderDetail(currentViewDate);
+  else renderEmptyDetail();
+  showToast(`已删除 ${formatDateLabel(date)} 的记录`);
+}
+
+/* ── Render detail ── */
+function renderDetail(date) {
+  const testRecs = getTestRecords();
+  const orderRecs = getOrderRecords();
+  const noteRecs = getNoteRecords();
+
+  const names = testRecs[date] || [];
+  const rawOrders = orderRecs[date] || {};
+  const notes = noteRecs[date] || {};
+  const orders = mergeOrders(rawOrders);
+
+  document.getElementById('pageTitle').textContent = `${formatDateFull(date)} 测试详情`;
+  document.getElementById('pageSubtitle').textContent = `共 ${names.length} 个素材 · 出单数据 ${Object.keys(rawOrders).length} 条`;
+
+  if (names.length === 0) {
+    renderEmptyDetail();
+    updateStats(0, 0, 0, 0);
+    return;
+  }
+
+  const detailTitle = document.getElementById('detailTitle');
+  detailTitle.textContent = `每日出单详情 — ${formatDateLabel(date)}`;
+
+  document.getElementById('detailActions').innerHTML = `
+    <button class="btn btn-sm" onclick="editMaterials('${date}')">编辑素材</button>`;
+
+  let orderedCount = 0, totalOrders = 0;
+
+  const filtered = tableFilter
+    ? names.filter(n => n.toLowerCase().includes(tableFilter.toLowerCase()))
+    : names;
+
+  const rows = filtered.map((name, idx) => {
+    const baseName = getBaseName(name);
+    const orderNum = orders[baseName] !== undefined ? orders[baseName] : null;
+    const hasOrder = orderNum !== null && orderNum > 0;
+
+    if (hasOrder) { orderedCount++; totalOrders += orderNum; }
+
+    const orderCell = orderNum !== null
+      ? `<td class="order-cell">${orderNum}</td>`
+      : `<td style="color:var(--text-dim)">-</td>`;
+
+    const statusBadge = hasOrder
+      ? `<span class="badge badge-green">已出单</span>`
+      : `<span class="badge badge-dim">待观察</span>`;
+
+    const noteVal = notes[name] || '';
+
+    return `<tr>
+      <td style="color:var(--text-dim);font-size:0.75rem;width:36px">${idx + 1}</td>
+      <td class="name-cell" onclick="copyName(this,'${esc(name).replace(/'/g,"\\'")}')"><span class="copy-tip">点击复制</span>${esc(name)}</td>
+      ${orderCell}
+      <td>${statusBadge}</td>
+      <td><input class="note-input" placeholder="添加备注" value="${esc(noteVal)}" onchange="saveNote('${date}','${esc(name)}',this.value)"></td>
+      <td style="width:32px"><button class="row-del-btn" onclick="removeMaterial('${date}','${esc(name).replace(/'/g,"\\'")}')">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  if (!tableFilter) {
+    orderedCount = 0; totalOrders = 0;
+    for (const name of names) {
+      const baseName = getBaseName(name);
+      const o = orders[baseName];
+      if (o !== undefined && o > 0) { orderedCount++; totalOrders += o; }
+    }
+  }
+
+  const rate = names.length > 0 ? Math.round((orderedCount / names.length) * 100) : 0;
+  updateStats(names.length, orderedCount, totalOrders, rate);
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="table-toolbar">
+      <input type="text" placeholder="搜索素材名称..." value="${esc(tableFilter)}" oninput="tableFilter=this.value; renderDetail('${date}')">
+      <span style="font-size:0.78rem;color:var(--text-dim)">显示 ${filtered.length} / ${names.length}</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="detail-table">
+        <thead><tr><th>#</th><th>素材名</th><th>出单数 (Results)</th><th>状态</th><th>备注</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderEmptyDetail() {
+  document.getElementById('pageTitle').textContent = '看板总览';
+  document.getElementById('pageSubtitle').textContent = '关联出单数据 · 按日追踪 · Copy 自动归并';
+  document.getElementById('detailTitle').textContent = '每日出单详情';
+  document.getElementById('detailActions').innerHTML = '';
+  document.getElementById('detailContent').innerHTML = `
+    <div class="empty-detail">
+      <span class="empty-icon">📋</span>
+      选择左侧日期或录入素材后查看详情
+    </div>`;
+  document.getElementById('inputSection').style.display = '';
+  document.getElementById('uploadSection').style.display = '';
+  document.getElementById('chartSection').style.display = 'none';
+}
+
+/* ── Summary view ── */
+let summaryFilter = '';
+let summarySort = { col: 'total', dir: 'desc' };
+
+let chartRange = 7;
+
+function showSummary() {
+  currentViewDate = null;
+  renderSidebar();
+  document.getElementById('summaryBtn').classList.add('active');
+  document.getElementById('inputSection').style.display = 'none';
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('chartSection').style.display = '';
+  renderChart();
+  renderSummary();
+}
+
+function setChartRange(days) {
+  chartRange = days;
+  renderChart();
+}
+
+function renderChart() {
+  document.getElementById('chartBtn7').classList.toggle('btn-primary', chartRange === 7);
+  document.getElementById('chartBtn7').style.color = chartRange === 7 ? '#fff' : '';
+  document.getElementById('chartBtn30').classList.toggle('btn-primary', chartRange === 30);
+  document.getElementById('chartBtn30').style.color = chartRange === 30 ? '#fff' : '';
+  document.getElementById('chartTitle').textContent = `出单趋势 — 近 ${chartRange} 日`;
+
+  const orderRecs = getOrderRecords();
+  const testRecs = getTestRecords();
+
+  const today = new Date();
+  const daySet = new Set();
+  const dayList = [];
+  for (let i = chartRange - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    dayList.push(ds);
+    daySet.add(ds);
+  }
+
+  const startDate = dayList[0];
+  const endDate = dayList[dayList.length - 1];
+  const allDates = new Set([...Object.keys(orderRecs), ...Object.keys(testRecs)]);
+  for (const d of allDates) {
+    if (d >= startDate && d <= endDate && !daySet.has(d)) {
+      dayList.push(d);
+      daySet.add(d);
+    }
+  }
+  dayList.sort();
+
+  const dayData = dayList.map(dateStr => {
+    const raw = orderRecs[dateStr] || {};
+    const merged = mergeOrders(raw);
+    const totalOrders = Object.values(merged).reduce((a, b) => a + b, 0);
+    const materialCount = (testRecs[dateStr] || []).length;
+    const orderedCount = Object.values(merged).filter(v => v > 0).length;
+    return { date: dateStr, totalOrders, materialCount, orderedCount };
+  });
+
+  const maxOrders = Math.max(...dayData.map(d => d.totalOrders), 1);
+
+  const unitHeight = Math.min(Math.max(Math.floor(180 / maxOrders), 4), 30);
+  const chartHeight = maxOrders * unitHeight;
+
+  const bars = dayData.map(d => {
+    const pct = d.totalOrders * unitHeight;
+    const [, m, day] = d.date.split('-');
+    const wd = getWeekday(d.date);
+    const isWeekend = wd === '六' || wd === '日';
+    const barClass = d.totalOrders > 0 ? 'has-order' : '';
+    const valClass = d.totalOrders === 0 ? 'zero' : '';
+    const matLabel = d.orderedCount > 0 ? `<span style="font-size:0.6rem;color:var(--green);font-weight:600;white-space:nowrap">出单${d.orderedCount}</span>` : '';
+
+    return `<div class="bar-group">
+      ${matLabel}
+      <span class="bar-value ${valClass}">${d.totalOrders > 0 ? d.totalOrders + '<span style="font-size:0.5rem;color:var(--text-dim);font-weight:400">单</span>' : ''}</span>
+      <div class="bar-fill ${barClass}" style="height:${Math.max(pct, 2)}px" title="${formatDateLabel(d.date)}: ${d.totalOrders}单, ${d.materialCount}素材, ${d.orderedCount}出单素材"></div>
+      <span class="bar-label">${parseInt(m)}/${parseInt(day)}</span>
+      <span class="bar-weekday" style="${isWeekend ? 'color:var(--orange)' : ''}">${wd}</span>
+    </div>`;
+  }).join('');
+
+  let tickStep = 1;
+  if (maxOrders > 20) tickStep = 5;
+  if (maxOrders > 50) tickStep = 10;
+  if (maxOrders > 100) tickStep = 20;
+  if (maxOrders > 200) tickStep = 50;
+
+  const yTicks = [];
+  for (let v = maxOrders; v >= 0; v -= tickStep) {
+    yTicks.push(v);
+  }
+  if (yTicks[yTicks.length - 1] !== 0) yTicks.push(0);
+
+  const yAxisHtml = `<div class="y-axis" style="height:${chartHeight}px">${yTicks.map(v => `<span>${v}</span>`).join('')}</div>`;
+
+  const totalAll = dayData.reduce((s, d) => s + d.totalOrders, 0);
+  const activeDays = dayData.filter(d => d.totalOrders > 0).length;
+  const avgPerDay = activeDays > 0 ? (totalAll / activeDays).toFixed(1) : 0;
+
+  const totalOrderedMaterials = dayData.reduce((s, d) => s + d.orderedCount, 0);
+
+  document.getElementById('chartContainer').innerHTML = `
+    <div class="chart-wrap">
+      <div class="chart-area">
+        <div class="bar-chart">${bars}</div>
+        ${yAxisHtml}
+      </div>
+    </div>
+    <div class="chart-legend">
+      <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--green)"></div> 有出单</div>
+      <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--accent)"></div> 无出单</div>
+      <div class="chart-legend-item">活跃 ${activeDays} 天</div>
+      <div class="chart-legend-item">日均 ${avgPerDay} 单</div>
+    </div>
+    <div class="chart-summary-cards">
+      <div class="chart-summary-card c-green">
+        <div class="csv">${totalOrderedMaterials}</div>
+        <div class="csl">出单素材总量（条）</div>
+      </div>
+      <div class="chart-summary-card c-orange">
+        <div class="csv">${totalAll}</div>
+        <div class="csl">总出单数量（单）</div>
+      </div>
+      <div class="chart-summary-card c-purple">
+        <div class="csv">${activeDays > 0 ? (totalOrderedMaterials / activeDays).toFixed(1) : 0}</div>
+        <div class="csl">日均出单素材</div>
+      </div>
+    </div>`;
+}
+
+function renderSummary() {
+  const orderRecs = getOrderRecords();
+  const dates = Object.keys(orderRecs).sort();
+
+  if (dates.length === 0) {
+    document.getElementById('pageTitle').textContent = '出单素材汇总';
+    document.getElementById('pageSubtitle').textContent = '暂无出单数据';
+    document.getElementById('detailTitle').textContent = '出单素材汇总';
+    document.getElementById('detailActions').innerHTML = `
+      <button class="btn btn-sm" onclick="exportSummaryCSV()">导出汇总 CSV</button>`;
+    document.getElementById('detailContent').innerHTML = `
+      <div class="empty-detail">
+        <span class="empty-icon">📊</span>
+        暂无出单数据，请先上传 Excel
+      </div>`;
+    updateStats(0, 0, 0, 0);
+    return;
+  }
+
+  const materialMap = {};
+
+  for (const date of dates) {
+    const raw = orderRecs[date] || {};
+    const merged = mergeOrders(raw);
+
+    for (const [name, count] of Object.entries(merged)) {
+      if (!materialMap[name]) {
+        materialMap[name] = { total: 0, dates: {}, firstDate: date, lastDate: date };
+      }
+      materialMap[name].total += count;
+      materialMap[name].dates[date] = count;
+      if (date > materialMap[name].lastDate) materialMap[name].lastDate = date;
+    }
+  }
+
+  let entries = Object.entries(materialMap).filter(([n]) => n);
+
+  const totalMaterials = entries.length;
+  const withOrders = entries.filter(([, v]) => v.total > 0).length;
+  const grandTotal = entries.reduce((sum, [, v]) => sum + v.total, 0);
+  const rate = totalMaterials > 0 ? Math.round((withOrders / totalMaterials) * 100) : 0;
+
+  updateStats(totalMaterials, withOrders, grandTotal, rate);
+
+  document.getElementById('pageTitle').textContent = '出单素材汇总';
+  document.getElementById('pageSubtitle').textContent = `跨 ${dates.length} 天 · ${totalMaterials} 个素材 · 总出单 ${grandTotal}`;
+
+  if (summaryFilter) {
+    entries = entries.filter(([name]) => name.toLowerCase().includes(summaryFilter.toLowerCase()));
+  }
+
+  entries = entries.filter(([, v]) => v.total > 0);
+
+  const col = summarySort.col;
+  const dir = summarySort.dir === 'asc' ? 1 : -1;
+  entries.sort((a, b) => {
+    if (col === 'name') return dir * a[0].localeCompare(b[0], 'zh-CN');
+    if (col === 'total') return dir * (a[1].total - b[1].total);
+    if (col === 'days') return dir * (Object.keys(a[1].dates).length - Object.keys(b[1].dates).length);
+    if (col === 'first') return dir * a[1].firstDate.localeCompare(b[1].firstDate);
+    if (col === 'last') return dir * a[1].lastDate.localeCompare(b[1].lastDate);
+    return 0;
+  });
+
+  function sortIcon(c) {
+    const isActive = summarySort.col === c;
+    const arrow = isActive ? (summarySort.dir === 'asc' ? '▲' : '▼') : '↕';
+    return `<button class="sort-btn ${isActive ? 'active' : ''}" onclick="toggleSummarySort('${c}')">${arrow}</button>`;
+  }
+
+  const rows = entries.map(([name, info], idx) => {
+    const dayCount = Object.keys(info.dates).length;
+    const dateDetails = Object.entries(info.dates)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([d, c]) => `${formatDateLabel(d)}: ${c}单`)
+      .join('、');
+
+    return `<tr>
+      <td style="color:var(--text-dim);font-size:0.73rem;width:32px">${idx + 1}</td>
+      <td class="name-cell" onclick="copyName(this,'${esc(name).replace(/'/g,"\\'")}')"><span class="copy-tip">点击复制</span><span style="word-break:break-all">${esc(name)}</span></td>
+      <td class="order-cell">${info.total}</td>
+      <td>${dayCount}</td>
+      <td>${formatDateLabel(info.firstDate)}</td>
+      <td>${formatDateLabel(info.lastDate)}</td>
+      <td style="font-size:0.75rem;color:var(--text-dim)" title="${dateDetails}">${dateDetails.length > 40 ? dateDetails.substring(0, 40) + '...' : dateDetails}</td>
+    </tr>`;
+  }).join('');
+
+  const filteredTotal = entries.reduce((sum, [, v]) => sum + v.total, 0);
+
+  document.getElementById('detailTitle').textContent = '出单素材汇总';
+  document.getElementById('detailActions').innerHTML = `
+    <button class="btn btn-sm" onclick="exportSummaryCSV()">导出汇总 CSV</button>`;
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="table-toolbar">
+      <input type="text" placeholder="搜索素材名称..." value="${esc(summaryFilter)}" oninput="summaryFilter=this.value; renderSummary()">
+      <span style="font-size:0.78rem;color:var(--text-dim)">显示 ${entries.length} 个出单素材，共 ${filteredTotal} 单</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="summary-table">
+        <thead><tr>
+          <th>#</th>
+          <th>素材名 ${sortIcon('name')}</th>
+          <th>总出单 ${sortIcon('total')}</th>
+          <th>出单天数 ${sortIcon('days')}</th>
+          <th>首次出单 ${sortIcon('first')}</th>
+          <th>最近出单 ${sortIcon('last')}</th>
+          <th>每日明细</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function toggleSummarySort(col) {
+  if (summarySort.col === col) {
+    summarySort.dir = summarySort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    summarySort.col = col;
+    summarySort.dir = col === 'name' ? 'asc' : 'desc';
+  }
+  renderSummary();
+}
+
+function exportSummaryCSV() {
+  const orderRecs = getOrderRecords();
+  const dates = Object.keys(orderRecs).sort();
+
+  const materialMap = {};
+  for (const date of dates) {
+    const merged = mergeOrders(orderRecs[date] || {});
+    for (const [name, count] of Object.entries(merged)) {
+      if (!materialMap[name]) materialMap[name] = { total: 0, dates: {} };
+      materialMap[name].total += count;
+      materialMap[name].dates[date] = count;
+    }
+  }
+
+  const entries = Object.entries(materialMap).filter(([, v]) => v.total > 0).sort((a, b) => b[1].total - a[1].total);
+
+  let csv = '\uFEFF素材名,总出单,出单天数';
+  for (const d of dates) csv += `,${d}`;
+  csv += '\n';
+
+  for (const [name, info] of entries) {
+    csv += `"${name}",${info.total},${Object.keys(info.dates).length}`;
+    for (const d of dates) csv += `,${info.dates[d] || 0}`;
+    csv += '\n';
+  }
+
+  downloadFile(csv, `出单素材汇总_${todayStr()}.csv`, 'text/csv;charset=utf-8');
+  showToast('已导出汇总 CSV');
+}
+
+function updateStats(total, ordered, orderCount, rate) {
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statOrdered').textContent = ordered;
+  document.getElementById('statOrderCount').textContent = orderCount;
+  document.getElementById('statRate').textContent = rate + '%';
+}
+
+/* ── Sync: clean orphan order data for a date ── */
+function syncDateData(date) {
+  const testRecs = getTestRecords();
+  const orderRecs = getOrderRecords();
+  const names = testRecs[date] || [];
+  const rawOrders = orderRecs[date] || {};
+  const baseNames = new Set(names.map(n => getBaseName(n)));
+
+  let removed = 0;
+  const orphans = [];
+  const cleaned = {};
+  for (const [key, val] of Object.entries(rawOrders)) {
+    const base = getBaseName(key);
+    if (baseNames.has(base)) {
+      cleaned[key] = val;
+    } else {
+      removed++;
+      orphans.push(key);
+    }
+  }
+
+  if (removed === 0) {
+    showToast(`${formatDateLabel(date)} 数据已是最新，无需同步`);
+    return;
+  }
+
+  const orphanList = orphans.slice(0, 5).map(n => `• ${n}`).join('\n');
+  const moreText = orphans.length > 5 ? `\n...等共 ${orphans.length} 条` : '';
+  if (!confirm(`${formatDateLabel(date)} 发现 ${removed} 条孤立出单数据（对应素材已删除），是否清理？\n\n${orphanList}${moreText}`)) return;
+
+  orderRecs[date] = cleaned;
+  setOrderRecords(orderRecs);
+  renderSidebar();
+  if (currentViewDate === date) renderDetail(date);
+  showToast(`已清理 ${formatDateLabel(date)} 的 ${removed} 条孤立出单数据`);
+}
+
+/* ── Remove single material from a date ── */
+function removeMaterial(date, name) {
+  const records = getTestRecords();
+  if (!records[date]) return;
+  records[date] = records[date].filter(n => n !== name);
+  setTestRecords(records);
+
+  const orderRecs = getOrderRecords();
+  if (orderRecs[date]) {
+    const baseName = getBaseName(name);
+    const remaining = records[date].map(n => getBaseName(n));
+    if (!remaining.includes(baseName)) {
+      const cleaned = {};
+      for (const [key, val] of Object.entries(orderRecs[date])) {
+        if (getBaseName(key) !== baseName) cleaned[key] = val;
+      }
+      orderRecs[date] = cleaned;
+      setOrderRecords(orderRecs);
+    }
+  }
+
+  if (records[date].length === 0) {
+    deleteDate(date);
+    return;
+  }
+
+  renderSidebar();
+  renderDetail(date);
+  showToast(`已删除素材: ${name.length > 20 ? name.substring(0, 20) + '...' : name}`);
+}
+
+/* ── Notes ── */
+function saveNote(date, name, value) {
+  const notes = getNoteRecords();
+  if (!notes[date]) notes[date] = {};
+  notes[date][name] = value;
+  setNoteRecords(notes);
+}
+
+/* ── Edit materials modal ── */
+function editMaterials(date) {
+  const records = getTestRecords();
+  const names = records[date] || [];
+
+  document.getElementById('modalContainer').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <h3>编辑素材列表 — ${formatDateLabel(date)}</h3>
+        <textarea id="editTextarea">${names.join('\n')}</textarea>
+        <p class="hint">每行一个素材名称，保存后将覆盖原有记录</p>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal()">取消</button>
+          <button class="btn btn-primary" onclick="saveEditedMaterials('${date}')">保存修改</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function saveEditedMaterials(date) {
+  const text = document.getElementById('editTextarea').value;
+  const names = text.split('\n').map(s => s.trim()).filter(Boolean);
+  if (names.length === 0) { showToast('素材列表不能为空', true); return; }
+
+  const records = getTestRecords();
+  records[date] = names;
+  setTestRecords(records);
+  closeModal();
+  renderSidebar();
+  renderDetail(date);
+  showToast(`已更新 ${formatDateLabel(date)} 的素材列表`);
+}
+
+function closeModal() {
+  document.getElementById('modalContainer').innerHTML = '';
+}
+
+/* ── Excel upload ── */
+fileInputEl.addEventListener('change', handleFile);
+
+fileDropEl.addEventListener('dragover', e => { e.preventDefault(); fileDropEl.classList.add('dragover'); });
+fileDropEl.addEventListener('dragleave', () => { fileDropEl.classList.remove('dragover'); });
+fileDropEl.addEventListener('drop', e => {
+  e.preventDefault();
+  fileDropEl.classList.remove('dragover');
+  if (e.dataTransfer.files.length) { fileInputEl.files = e.dataTransfer.files; handleFile(); }
+});
+
+let lastUploadBackup = null;
+
+function handleFile() {
+  const file = fileInputEl.files[0];
+  if (!file) return;
+
+  const targetDate = uploadDateEl.value;
+  if (!targetDate) { showToast('请先选择出单对应的测试日期', true); return; }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      if (json.length === 0) { showToast('文件中没有数据', true); return; }
+
+      const headers = Object.keys(json[0]);
+      const result = matchColumns(json);
+
+      if (!result) {
+        uploadResultEl.innerHTML = `<span style="color:var(--red)">❌ 无法匹配列。检测到的列名：[${headers.join(', ')}]<br>请确保文件包含素材名列和 Results 列</span>`;
+        showToast('无法自动匹配列', true);
+        return;
+      }
+
+      const parsed = [];
+      let mergedCount = 0;
+      for (const row of json) {
+        const name = String(row[result.nameCol]).trim();
+        const rawVal = row[result.orderCol];
+        const count = parseFloat(rawVal) || 0;
+        if (!name) continue;
+        const baseName = getBaseName(name);
+        if (baseName !== name) mergedCount++;
+        parsed.push({ raw: name, base: baseName, count });
+      }
+
+      const mergedPreview = {};
+      for (const p of parsed) {
+        mergedPreview[p.base] = (mergedPreview[p.base] || 0) + p.count;
+      }
+      const withOrders = Object.entries(mergedPreview).filter(([,v]) => v > 0).sort((a,b) => b[1] - a[1]);
+      const totalCount = parsed.reduce((s, p) => s + p.count, 0);
+
+      const previewRows = withOrders.slice(0, 10).map(([n, c], i) =>
+        `<tr><td style="color:var(--text-dim);font-size:0.73rem">${i+1}</td><td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(n)}">${esc(n)}</td><td style="font-weight:600">${c}</td></tr>`
+      ).join('');
+      const moreText = withOrders.length > 10 ? `<p style="font-size:0.78rem;color:var(--text-dim);margin-top:8px">...还有 ${withOrders.length - 10} 个素材</p>` : '';
+      const mergeNote = mergedCount > 0 ? `<p style="font-size:0.78rem;color:var(--text-dim);margin-top:4px">${mergedCount} 条 Copy 数据已归并</p>` : '';
+
+      document.getElementById('modalContainer').innerHTML = `
+        <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+          <div class="modal" style="width:540px">
+            <h3>确认导入出单数据</h3>
+            <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+              <div><span style="font-size:0.78rem;color:var(--text-dim)">目标日期</span><br><strong>${formatDateLabel(targetDate)}</strong></div>
+              <div><span style="font-size:0.78rem;color:var(--text-dim)">匹配列</span><br><strong>${esc(result.nameCol)} → ${esc(result.orderCol)}</strong></div>
+              <div><span style="font-size:0.78rem;color:var(--text-dim)">数据行</span><br><strong>${parsed.length} 行</strong></div>
+              <div><span style="font-size:0.78rem;color:var(--text-dim)">总出单</span><br><strong>${totalCount}</strong></div>
+              <div><span style="font-size:0.78rem;color:var(--text-dim)">出单素材</span><br><strong>${withOrders.length}</strong></div>
+            </div>
+            ${mergeNote}
+            <div style="max-height:240px;overflow-y:auto;margin-top:8px">
+              <table class="detail-table" style="font-size:0.82rem">
+                <thead><tr><th>#</th><th>素材名</th><th>出单数</th></tr></thead>
+                <tbody>${previewRows}</tbody>
+              </table>
+            </div>
+            ${moreText}
+            <div class="modal-actions">
+              <button class="btn" onclick="closeModal()">取消</button>
+              <button class="btn btn-primary" onclick="confirmUpload()">确认导入</button>
+            </div>
+          </div>
+        </div>`;
+
+      window._pendingUpload = { parsed, targetDate, result, mergedCount, totalCount };
+      fileInputEl.value = '';
+    } catch (err) {
+      showToast('文件解析失败：' + err.message, true);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function confirmUpload() {
+  const { parsed, targetDate, result, mergedCount, totalCount } = window._pendingUpload;
+  if (!parsed) return;
+
+  lastUploadBackup = {
+    date: targetDate,
+    oldOrders: JSON.parse(JSON.stringify(getOrderRecords()[targetDate] || {})),
+    oldTest: JSON.parse(JSON.stringify(getTestRecords()[targetDate] || []))
+  };
+
+  const orderRecs = getOrderRecords();
+  const testRecs = getTestRecords();
+  if (!orderRecs[targetDate]) orderRecs[targetDate] = {};
+  if (!testRecs[targetDate]) testRecs[targetDate] = [];
+
+  const existingBaseNames = new Set(testRecs[targetDate].map(n => getBaseName(n)));
+
+  const mergedImport = {};
+  for (const p of parsed) {
+    mergedImport[p.base] = (mergedImport[p.base] || 0) + p.count;
+  }
+
+  for (const [baseName, count] of Object.entries(mergedImport)) {
+    orderRecs[targetDate][baseName] = (orderRecs[targetDate][baseName] || 0) + count;
+    if (!existingBaseNames.has(baseName)) {
+      testRecs[targetDate].push(baseName);
+      existingBaseNames.add(baseName);
+    }
+  }
+
+  setOrderRecords(orderRecs);
+  setTestRecords(testRecs);
+
+  const uniqueCount = Object.keys(mergedImport).length;
+  const mergeInfo = mergedCount > 0 ? `，${mergedCount} 条 Copy 已归并（${uniqueCount} 个独立素材）` : '';
+
+  uploadResultEl.innerHTML = `<span style="color:var(--green)">✓ 已导入 ${parsed.length} 行，总 Results: ${totalCount}${mergeInfo}</span>
+    <button class="btn btn-sm btn-danger" onclick="undoUpload()" style="margin-left:8px">撤回导入</button>`;
+
+  currentViewDate = targetDate;
+  renderSidebar();
+  renderDetail(targetDate);
+  closeModal();
+  window._pendingUpload = null;
+  showToast(`已导入 ${parsed.length} 条出单数据`);
+}
+
+function undoUpload() {
+  if (!lastUploadBackup) { showToast('没有可撤回的操作', true); return; }
+
+  const { date, oldOrders, oldTest } = lastUploadBackup;
+  const orderRecs = getOrderRecords();
+  const testRecs = getTestRecords();
+
+  if (Object.keys(oldOrders).length === 0) {
+    delete orderRecs[date];
+  } else {
+    orderRecs[date] = oldOrders;
+  }
+
+  if (oldTest.length === 0) {
+    delete testRecs[date];
+  } else {
+    testRecs[date] = oldTest;
+  }
+
+  setOrderRecords(orderRecs);
+  setTestRecords(testRecs);
+
+  lastUploadBackup = null;
+  uploadResultEl.innerHTML = '<span style="color:var(--text-dim)">已撤回上次导入</span>';
+
+  if (currentViewDate === date) {
+    if (testRecs[date] && testRecs[date].length > 0) {
+      renderDetail(date);
+    } else {
+      const remaining = Object.keys(testRecs).sort().reverse();
+      currentViewDate = remaining[0] || null;
+      if (currentViewDate) renderDetail(currentViewDate);
+      else renderEmptyDetail();
+    }
+  }
+
+  renderSidebar();
+  showToast(`已撤回 ${formatDateLabel(date)} 的出单导入`);
+}
+
+function matchColumns(json) {
+  const headers = Object.keys(json[0]);
+  const namePatterns = ['素材', '名称', '素材名', '创意', 'creative', 'name', 'material', 'ad', 'campaign'];
+  const orderPatterns = ['results', 'result', '出单', '订单', '转化', '单数', 'order', 'conversion', 'orders', 'installs', 'purchase'];
+
+  let nameCol = null;
+  let orderCol = null;
+
+  for (const h of headers) {
+    const lower = h.toLowerCase().trim();
+    if (!orderCol && lower === 'results') orderCol = h;
+    if (!nameCol && namePatterns.some(p => lower.includes(p))) nameCol = h;
+    if (!orderCol && orderPatterns.some(p => lower.includes(p))) orderCol = h;
+  }
+
+  if (!nameCol) nameCol = headers[0];
+  if (!orderCol) {
+    for (const h of headers) {
+      if (h.toLowerCase().trim().includes('result')) { orderCol = h; break; }
+    }
+  }
+
+  if (nameCol && orderCol && nameCol !== orderCol) return { nameCol, orderCol };
+  return null;
+}
+
+/* ── Export current date CSV ── */
+function exportCSV() {
+  if (!currentViewDate) { showToast('请先选择一个日期', true); return; }
+
+  const testRecs = getTestRecords();
+  const orderRecs = getOrderRecords();
+  const noteRecs = getNoteRecords();
+  const names = testRecs[currentViewDate] || [];
+  const rawOrders = orderRecs[currentViewDate] || {};
+  const orders = mergeOrders(rawOrders);
+  const notes = noteRecs[currentViewDate] || {};
+
+  let csv = '\uFEFF素材名,出单数,状态,备注\n';
+  for (const name of names) {
+    const baseName = getBaseName(name);
+    const orderNum = orders[baseName] !== undefined ? orders[baseName] : '';
+    const status = (orderNum && orderNum > 0) ? '已出单' : '待观察';
+    csv += `"${name}",${orderNum},${status},"${notes[name] || ''}"\n`;
+  }
+
+  downloadFile(csv, `素材测试_${currentViewDate}.csv`, 'text/csv;charset=utf-8');
+  showToast('已导出 CSV');
+}
+
+/* ── Export all dates CSV ── */
+function exportAllCSV() {
+  const testRecs = getTestRecords();
+  const orderRecs = getOrderRecords();
+  const noteRecs = getNoteRecords();
+  const dates = Object.keys(testRecs).sort();
+
+  if (dates.length === 0) { showToast('没有数据可导出', true); return; }
+
+  let csv = '\uFEFF日期,素材名,出单数,状态,备注\n';
+  for (const date of dates) {
+    const names = testRecs[date] || [];
+    const rawOrders = orderRecs[date] || {};
+    const orders = mergeOrders(rawOrders);
+    const notes = noteRecs[date] || {};
+
+    for (const name of names) {
+      const baseName = getBaseName(name);
+      const orderNum = orders[baseName] !== undefined ? orders[baseName] : '';
+      const status = (orderNum && orderNum > 0) ? '已出单' : '待观察';
+      csv += `${date},"${name}",${orderNum},${status},"${notes[name] || ''}"\n`;
+    }
+  }
+
+  downloadFile(csv, `素材测试_全部_${todayStr()}.csv`, 'text/csv;charset=utf-8');
+  showToast('已导出全部数据');
+}
+
+/* ── Backup / Restore ── */
+function exportBackup() {
+  const backup = {
+    testRecords: getTestRecords(),
+    orderRecords: getOrderRecords(),
+    noteRecords: getNoteRecords(),
+    exportedAt: new Date().toISOString()
+  };
+  downloadFile(JSON.stringify(backup, null, 2), `素材看板备份_${todayStr()}.json`, 'application/json');
+  showToast('备份数据已导出');
+}
+
+function importBackup() { backupFileInputEl.click(); }
+
+backupFileInputEl.addEventListener('change', () => {
+  const file = backupFileInputEl.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.testRecords) throw new Error('无效的备份文件');
+      if (!confirm('导入将覆盖当前所有数据，是否继续？')) return;
+
+      setTestRecords(data.testRecords);
+      if (data.orderRecords) setOrderRecords(data.orderRecords);
+      if (data.noteRecords) setNoteRecords(data.noteRecords);
+
+      const dates = Object.keys(data.testRecords).sort().reverse();
+      currentViewDate = dates[0] || null;
+      renderSidebar();
+      if (currentViewDate) renderDetail(currentViewDate);
+      else renderEmptyDetail();
+      showToast('数据恢复成功');
+    } catch (err) {
+      showToast('导入失败：' + err.message, true);
+    }
+  };
+  reader.readAsText(file);
+  backupFileInputEl.value = '';
+});
+
+/* ── Utilities ── */
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyName(el, name) {
+  navigator.clipboard.writeText(name).then(() => {
+    const tip = el.querySelector('.copy-tip');
+    if (tip) { tip.textContent = '已复制'; setTimeout(() => { tip.textContent = '点击复制'; }, 1000); }
+    showToast('已复制: ' + (name.length > 30 ? name.substring(0, 30) + '...' : name));
+  });
+}
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast' + (isError ? ' error' : '');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+
+/* ── Init ── */
+async function init() {
+  inputDateEl.value = todayStr();
+  uploadDateEl.value = yesterdayStr();
+
+  await loadSharedData();
+
+  renderSidebar();
+
+  const records = getTestRecords();
+  const dates = Object.keys(records).sort().reverse();
+  if (dates.length > 0) {
+    currentViewDate = dates[0];
+    renderSidebar();
+    renderDetail(currentViewDate);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
